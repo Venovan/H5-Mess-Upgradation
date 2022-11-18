@@ -10,6 +10,10 @@ STATUS = [  ('A', "Allowed"),
             ('NA', "Not Allowed")]
 
 
+MSG_LEVELS = [  ("warning", 'Warning'),
+                ("alert", "Alert"),
+                ("notify", "Notification"),
+                ("info", "Information")]
 
 def ID_valid(value):
     if (len(value) != 9):
@@ -52,3 +56,13 @@ class Meal(models.Model):
     def __str__(self):
         return self.student.rollNumber + "/" + str(self.date) + "/" + self.type
 
+
+
+class Announcement(models.Model):
+    body = models.TextField(blank=True)
+    display = models.BooleanField(default=False)
+    link = models.URLField(max_length=200, blank=True)
+    level = models.CharField(max_length = 12, choices=MSG_LEVELS, default="info")
+
+    def __str__(self):
+        return self.level + str(self.pk)
