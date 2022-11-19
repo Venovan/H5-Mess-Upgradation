@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils.timezone import now
 
 MEAL_CHOICES = [('B', 'Breakfast'),
                 ('L', 'Lunch'),
@@ -15,16 +16,21 @@ MSG_LEVELS = [  ("warning", 'Warning'),
                 ("notify", "Notification"),
                 ("info", "Information")]
 
+
 def ID_valid(value):
     if (len(value) != 9):
         raise ValidationError(("%(value)s is invalid"), params={"value": value})
     else:
         return value
 
-def rename(instance, filename):
+def image_handler(instance, filename):
     ext = filename.split('.')[-1]
-    return '{}.{}'.format(instance.rollNumber, ext)
+    return "/".join(["photos", '{}.{}'.format(instance.rollNumber, ext)])
 
+def menu_handler(instance, filename):
+    ext = filename.split('.')[-1]
+    return "/".join(["menu", '{}.{}'.format(instance.file.name, ext)])
+    
 
 
 # Create your models here.
@@ -33,8 +39,8 @@ class Student(models.Model):
     permission = models.CharField(max_length=10, choices=STATUS, default='NA')
     rollNumber = models.CharField(max_length=12, validators=[ID_valid], unique=True)
     roomNumber = models.CharField(max_length=6)
-    RFID = models.CharField(max_length=15, blank=True, unique=True)
-    photo = models.ImageField(upload_to= rename, default='default.jpg')
+    RFID = models.CharField(max_length=15, blank=True, unique=True, null=True)
+    photo = models.ImageField(upload_to=image_handler, default='default.png')
 
     class Meta:
         ordering = ["rollNumber"]
@@ -66,3 +72,12 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.level + str(self.pk)
+
+
+class Menu(models.Model):
+    file = models.FileField(upload_to=menu_handler)
+    start = models.DateField(auto_now=False, default=now)
+    end = models.DateField(auto_now=False, default=now)
+
+    def __str__(self):
+        return str(self.start.day) + str(self.start.strftime('%b')) + "-" + str(self.end.day) + str(self.end.strftime('%b')) 
