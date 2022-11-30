@@ -36,18 +36,19 @@ def menu_handler(instance, filename):
 # Create your models here.
 class Student(models.Model):
     name = models.CharField(max_length=50)
+    alias = models.CharField(max_length=10, blank=True)
     permission = models.CharField(max_length=10, choices=STATUS, default='NA')
     rollNumber = models.CharField(max_length=12, validators=[ID_valid], unique=True)
     roomNumber = models.CharField(max_length=6)
-    RFID = models.CharField(max_length=15, blank=True, unique=True, null=True)
+    RFID = models.CharField(max_length=15, blank=True, unique=False, null=True)
     photo = models.ImageField(upload_to=image_handler, default='default.png')
 
     class Meta:
         ordering = ["rollNumber"]
 
-
     def __str__(self):
         return self.name
+
 
 
 class Meal(models.Model):
@@ -72,6 +73,7 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.level + str(self.pk)
+
 
 
 class Menu(models.Model):

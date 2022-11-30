@@ -21,16 +21,11 @@
 #include <String.h>
 #include <Wifi.h>
 
-const char* ssid = "RAJ 7539";
-const char* password = "Alohomora";
+const char* ssid = "Samsung M31";
+const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.10.81:8000/mess/register/";
-
-
-char path[] = "/echo";
-char host[] = "demos.kaazing.com";
-
+String serverName = "http://127.0.0.1:8000/mess/weight/";
 
 
 //RFID decalarations
@@ -42,16 +37,16 @@ MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
 MFRC522::MIFARE_Key key;
 byte nuidPICC[4];
 
-
+//LCD declarations
 const int rs = 4, en = 13, d4 = 14, d5 = 21, d6 = 15, d7 = 22;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
+//Variable declarations
 int Pincode;
 int Exit = 0;
 int EnterPin = 25;
 int CancelPin = 26;
 int httpResponseCode;
-const byte interruptpin = 2;
 int data = 0, Enter = 0, Cancel = 0;
 
 void setup() {
@@ -93,44 +88,6 @@ void setup() {
 }
 
 
-/*
-void loop() {
-    //generate a random 4-digit pin
-    Pincode = random(1000, 10000);
-    //send this pin to server via websocket protocol
-    if (Wifi.status() == WL_CONNECTED)){
-        HTTPClient http;
-        String server = serverName + "?" + String(Pincode);
-        http.begin(server.c_str());
-        while (data.length() ==0){
-          int httpResponseCode = http.GET();
-          if (httpResponseCode > 0){
-            String data = http.getString();
-            Serial.println(payload);
-          }
-          else {
-            Serial.print("Error code: ");
-            Serial.println(httpResponseCode);
-          }
-          
-          if (valid_card()){
-            http.begin((serverName + "?" + String(Hex_to_string(rfid.uid.uidByte)).c_str());
-          }
-        }
-        char *temp;
-        if (data.length() > 0){  //data == "/Name/status/"
-          temp =strtok(data, "/");
-          //print Hi, Name
-          temp=strtok(data, "/");
-          //shift to 2nd line and print the status
-        }
-        data = ""; //clear data
-    }
-    else{
-        Serial.println("Client is disconnected.");
-    }
-*/
-
 void loop(){
   /*
   if (valid_card()){
@@ -167,7 +124,7 @@ void loop(){
     
     while(data == 0){
       lcd.setCursor(0, 1);
-      lcd.print("Tap ID or use pin"); 
+      lcd.print("Tap ID / use pin"); 
       if (valid_card()){
         Serial.println("Valid Card detected");
         lcd.setCursor(0, 0);    
@@ -175,7 +132,7 @@ void loop(){
         lcd.setCursor(0, 1);
         lcd.print("  Card Detected  ");
         delay(1000);
-        lcd.se tCursor(0, 1);
+        lcd.setCursor(0, 1);
         lcd.print("  Push to send");
         Serial.print("waiting for user to push any button");
         delay(500);
@@ -250,14 +207,15 @@ bool valid_card(){
 String Hex_to_String(byte *buffer, byte bufferSize){
     String ID = "";
     String Number = "";
-    for (byte i = 0; i < bufferSize; i++){
-      if (buffer[i] <  0x10){
-        ID = "Invalid";
-        return ID;        
+    for (byte i = 0; i< bufferSize; i++){
+      if (buffer[i] < 0x10){
+        Number = "0" + String(buffer[i], HEX); 
+      }
+      else{
+        Number = String(buffer[i], HEX);
       }        
-      Number = String(buffer[i], HEX);
       Number.toUpperCase();
       ID = ID + Number;
-    }
+    }      
     return ID;
 }

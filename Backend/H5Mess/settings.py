@@ -26,8 +26,10 @@ SECRET_KEY = "django-insecure-fe1navnc)ec$1-6d*)x8q4o#ihzfu@y79mkz($1ut!xrtfub_f
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["0.0.0.0", "127.0.0.1", "192.168.10.81"]
+ALLOWED_HOSTS = [".ngrok.io", "127.0.0.1", "localhost", "192.168.100.81"]
 DATE_INPUT_FORMATS = ['%d-%m-%Y']
+CSRF_TRUSTED_ORIGINS = ["https://6af0-2409-4081-9d8a-99b8-801-72dd-c2ec-1f8d.in.ngrok.io", "http://127.0.0.1:8000/admin/"]
+
 
 # Application definition
 

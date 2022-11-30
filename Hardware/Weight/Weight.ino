@@ -20,12 +20,13 @@
 #include <HTTPClient.h>
 #include <String.h>
 #include <Wifi.h>
+#include "HX711.h"
 
-const char* ssid = "RAJ 7539";
-const char* password = "Alohomora";
+const char* ssid = "Samsung M31";
+const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.10.81:8000/mess/register/";
+String serverName = "http://192.168.100.81:8000/mess/weight/";
 
 
 
@@ -39,22 +40,31 @@ MFRC522::MIFARE_Key key;
 byte nuidPICC[4];
 
 
+//HX711 declaration
+#define DOUT 5
+#define CLK 6
+//HX711 scale(DOUT, CLK);
+
+
+//LCD declarations
 const int rs = 4, en = 13, d4 = 14, d5 = 21, d6 = 15, d7 = 22;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
+
+//Variable declarations
 int Pincode;
-int Exit = 0;
-int EnterPin = 25;
-int CancelPin = 26;
 int httpResponseCode;
-const byte interruptpin = 2;
-int data = 0, Enter = 0, Cancel = 0;
+
 
 void setup() {
   Serial.begin(115200);
- 
-  pinMode(EnterPin, INPUT);
-  pinMode(CancelPin, INPUT);  
+  
+  //setup for HX711
+  //pinMode(reset, INPUT_PULLUP);
+  //scale.set_scale();
+  //scale.tare();
+  
+  
   // setup for RC522
   SPI.begin();      // Init SPI bus
   rfid.PCD_Init();  // Init MFRC522 
@@ -69,7 +79,7 @@ void setup() {
 
   //LCD setup for 16x2 display module
   lcd.begin(16, 2);
-  lcd.print("Hello World");
+  lcd.print("Hello world");
 
   //WiFi setup
   WiFi.begin(ssid, password);
@@ -85,27 +95,18 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
+  //random seed
   randomSeed(analogRead(0));
 }
 
 
 void loop(){
-  /*
-  if (valid_card()){
-    Serial.println(Hex_to_String(rfid.uid.uidByte, rfid.uid.size));
-    lcd.setCursor(0, 1);
-    lcd.print(Hex_to_String(rfid.uid.uidByte, rfid.uid.size));
-  }
-  delay(1000);
-  Serial.println("OK");*/
-  Pincode = random(1000, 10000);  
-  Serial.println(Pincode);
+  
+  Pincode = random(1000, 10000);                                        //generate a 4-digit pin
+  Serial.println(Pincode);                            
   lcd.clear();
-  lcd.setCursor(5, 0);
-  lcd.print(Pincode);
-  data = 0;
-  Enter = 0;
-  Cancel = 0;
+  LCDprint(String(Pincode), 1);
+
   
   if (WiFi.status()==WL_CONNECTED){
     HTTPClient http;
@@ -115,57 +116,96 @@ void loop(){
     httpResponseCode = http.GET();
     if (httpResponseCode = 202) {
       Serial.print("PinCode Accepted");
-      lcd.setCursor(0, 1);
-      lcd.print("  Pin Accepted ");     
-      }
+      LCDprint("Pincode Accepted", 1);   
+    }
     else{
       Serial.print("Rejected with Error code:");
       Serial.println(httpResponseCode);
     }
     
-    while(data == 0){
-      lcd.setCursor(0, 1);
-      lcd.print("Tap ID or use pin"); 
-      if (valid_card()){
-        Serial.println("Valid Card detected");
-        lcd.setCursor(0, 0);    
-        lcd.print("    " + Hex_to_String(rfid.uid.uidByte, rfid.uid.size));
-        lcd.setCursor(0, 1);
-        lcd.print("  Card Detected  ");
+    while(true){
+      LCDprint("Tap ID/Use pin", 1); 
+      if (valid_card()){        
+        Serial.println("Valid Card Found");   
+        LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
+        LCDprint("Valid Card Found", 1);
         delay(1000);
-        lcd.se tCursor(0, 1);
-        lcd.print("  Push to send");
-        Serial.print("waiting for user to push any button");
-        delay(500);
-        while(Enter == 0 && Cancel == 0){
-          Serial.println("looping");       
-          Enter = digitalRead(EnterPin);
-          delay(10);
-          Cancel = digitalRead(CancelPin);
-          delay(10);                                               
-        }
-        if (Enter == 1){
-          lcd.setCursor(0, 1);
-          lcd.print("  sending...");
-          delay(100);
-          Serial.println(Hex_to_String(rfid.uid.uidByte, rfid.uid.size).length());
-          serverpath = serverName + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
-          http.begin(serverpath.c_str());
-          httpResponseCode = http.GET();
-          if (httpResponseCode = 423) {
-            lcd.setCursor(0, 1);
-            lcd.print("  Mapping Done  ");
+        serverpath = serverName + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+        http.begin(serverpath.c_str());
+        switch(httpResponseCode = http.GET()){
+          case 403:
+          {
+            String payload = http.getString();
+            LCDprint("Sorry, " + payload, 0);
+            LCDprint("Meal Forbidden", 1);
+            break;   
+          }                           
+          case 200:
+          {
+            String payload =  http.getString();
+            LCDprint("Hii, " + payload, 0);
+            LCDprint("Take Your Plate", 1);                    
+            break;
+          }                      
+          case 208:
+          {           
+            String payload = http.getString();
+            LCDprint("Hii, " + payload, 0); 
+            LCDprint("Already Taken", 0);
+            break;
           }
-          else{
-            lcd.setCursor(0, 1);
-            lcd.print("Error");
-          }                
+          case 404:
+          {         
+            LCDprint("Not Registered", 0);
+            break;
+          }
+          default:
+            LCDprint("Unknown Response", 0);                              
         }
-        data = 1;
-      }      
+        break;                 
+      }
+      serverpath = serverName + "update";
+      http.begin(serverpath.c_str());
+      httpResponseCode = http.GET();
+      Serial.println("Sent data");
+      if (httpResponseCode == 204){
+        Serial.println("204 no content");        
+        continue;
+      }
+      switch(httpResponseCode){                     
+        case 403:
+        {
+          String payload = http.getString();
+          LCDprint("Sorry, " + payload, 0);
+          LCDprint("Meal Forbidden", 1); 
+          break; 
+        }                 
+        case 200:
+        {
+          String payload =  http.getString();
+          LCDprint("Hii, " + payload, 0);
+          LCDprint("Take Your Plate", 1);                    
+          break;
+        }
+        case 208:
+        {        
+          String payload = http.getString();
+          LCDprint("Hii, " + payload, 0); 
+          LCDprint("Already Taken", 0);
+          break;
+        }
+        case 404: 
+        {                  
+          LCDprint("Not Registered", 0);
+        }  
+        default:
+          LCDprint("Unknown Response", 0);                              
+      }
+      break;                 
     }
+  }
+}      
 
-  } }
 
 bool valid_card(){
     //not valid if no card is nearby
@@ -205,17 +245,44 @@ bool valid_card(){
     return false;
     }
 
+
+
 String Hex_to_String(byte *buffer, byte bufferSize){
     String ID = "";
     String Number = "";
-    for (byte i = 0; i < bufferSize; i++){
-      if (buffer[i] <  0x10){
-        ID = "Invalid";
-        return ID;        
+    for (byte i = 0; i< bufferSize; i++){
+      if (buffer[i] < 0x10){
+        Number = "0" + String(buffer[i], HEX); 
+      }
+      else{
+        Number = String(buffer[i], HEX);
       }        
-      Number = String(buffer[i], HEX);
       Number.toUpperCase();
       ID = ID + Number;
-    }
+    }      
     return ID;
+}
+
+void LCDprint(String msg, int line){  
+    int len = msg.length();
+    lcd.setCursor(0, line);  
+    if (len > 16){
+      lcd.print("  Length Error  ");
+    }
+    else{
+      if (len % 2 == 0){
+        lcd.print(multiply(" ", (16-len)/2) + msg + multiply(" ", (16-len)/2));  
+      }
+      else{
+        lcd.print(multiply(" ", (16-len-1)/2) + msg + multiply(" ", (16-len+1)/2));  
+      } 
+    }
+    }
+
+
+String multiply(String msg, int multiple){
+  for (int i =0; i<multiple; i++){
+    msg = msg + msg;
+  }
+  return msg;
 }
