@@ -1,4 +1,3 @@
-from asyncio.windows_events import NULL
 from .models import Meal, Student, Menu, Announcement
 from rest_framework import serializers
 from datetime import datetime
@@ -19,14 +18,13 @@ elif hours in range(16, 19):
 elif hours in range(19, 23):
     MEAL_TYPE = 'D'
 else:
-    MEAL_TYPE = NULL
+    MEAL_TYPE = None
 
 
 class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = "__all__"
-
 
 
 class LoginSerializer(serializers.ModelSerializer):
@@ -37,9 +35,9 @@ class LoginSerializer(serializers.ModelSerializer):
         fields = ["name", "status"]
 
     def get_status(self, student):
-        
+
         try:
-            Meal.objects.get(student = student, date = today, type=MEAL_TYPE)
+            Meal.objects.get(student=student, date=today, type=MEAL_TYPE)
             status = "Taken"
         except Meal.DoesNotExist:
             status = "Allowed"
@@ -47,7 +45,6 @@ class LoginSerializer(serializers.ModelSerializer):
         if student.permission == "NA":
             status = "Not Allowed"
         return status
-
 
 
 class MenuSerializer(serializers.ModelSerializer):
