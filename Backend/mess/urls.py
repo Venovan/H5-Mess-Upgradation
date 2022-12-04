@@ -7,6 +7,6 @@ urlpatterns = [
     path("register/<str:rfid_pin>", views.register),
     path("weight/<str:rfid_pin>", views.weight),
     path("app/<str:call>", views.app),
-    path("stats/str:call", views.arena)
+    path("stats/<str:call>", views.arena)
 ]
 

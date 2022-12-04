@@ -4,9 +4,9 @@ from .serializer import LoginSerializer, StudentSerializer, MenuSerializer, Noti
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from datetime import datetime
-from django.db.models import Avg
-
+from datetime import datetime, timedelta
+from django.db.models import Avg, Sum, Variance
+import numpy as np
 
 today = str(datetime.now().date())
 hours = datetime.now().hour
@@ -175,7 +175,7 @@ def app(request, call):
             return Response(serializer.data)
       
     elif request.method == "POST":
-        if call == "new": 
+        if call == "newStudent": 
             serializer = StudentSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save()
@@ -186,21 +186,63 @@ def app(request, call):
 @api_view(['GET'])
 def arena(request, call): 
     if request.method == 'GET':
-        if call == "dailyTotal":
-            return Response(average_day_waste(request.data.get("date")))
+        if call == "dateTotal":
+            return Response(avg(request.data.get("date"), request.data.get("type")))
+        elif call == "dateAvg":
+            return Response(average_day_waste(request.data.get("date"), request.data.get("type")))
+        elif call == "dateVar":
+            return Response(variance_date_waste(request.data.get("date"), request.data.get("type")))
         elif call == "movingAvg":
-            return Response(moving_avg_waste(request.data.get("start"), request.data.get("end")))
-            pass
+            end = request.data.get("end")
+            end = datetime(int(end.split("/")[0]), int(end.split("/")[1]), int(end.split("/")[2]))
+            start = end - timedelta(days=int(request.data.get("days")))
+            return Response(moving_avg_waste(start, end, request.data.get("type")))
+
 #OVERALL STATISTICS API CALLS
 
 
-def average_day_waste(date):
-    date_avg = Meal.objects.filter(date=date).aggregate(Avg("weight"))
-    return date_avg
+def average_day_waste(date, type=None):
+    date=datetime(int(date.split("/")[0]), int(date.split("/")[1]), int(date.split("/")[2]))
+    print(type)
+    if type == None:
+        return Meal.objects.filter(date=date).aggregate(Avg("weight"))
+    else:
+        return Meal.objects.filter(date=date, type=type).aggregate(Avg("weight"))
 
-def moving_avg_waste(start, end):
-    moving_avg = Meal.objects.filter(date__range = [start, end]).aggregate(Avg("weight"))
-    return moving_avg
+
+
+def avg(date, type=None):
+    date=datetime(int(date.split("/")[0]), int(date.split("/")[1]), int(date.split("/")[2]))
+    if type == None:
+        ar = np.array(Meal.objects.filter(date=date).values_list("weight", flat=True)).astype(int)
+        print(ar)
+        return Meal.objects.filter(date=date).aggregate(Sum("weight"))
+    else:
+        return Meal.objects.filter(date=date, type=type).aggregate(Sum("weight"))
+
+
+def total_day_waste(date, type=None):
+    date=datetime(int(date.split("/")[0]), int(date.split("/")[1]), int(date.split("/")[2]))
+    print(type)
+    if type == None:
+        return Meal.objects.filter(date=date).aggregate(Sum("weight"))
+    else:
+        return Meal.objects.filter(date=date, type=type).aggregate(Sum("weight"))
+
+def variance_date_waste(date, type=None):
+    date = datetime(int(date.split("/")[0]), int(date.split("/")[1]), int(date.split("/")[2]))
+    if type == None:
+        return Meal.objects.filter(date=date).aggregate(Variance("weight"))
+    else:
+        return Meal.objects.filter(date=date, type=type).aggregate(Variance("weight"))
+
+
+
+def moving_avg_waste(start, end, type=None):
+    if type == None:
+        return Meal.objects.filter(date__range = [start, end]).aggregate(Avg("weight"))
+    else:
+        return Meal.objects.filter(date__range = [start, end], type=type).aggregate(Avg("weight"))
 
 
 #INDIVIDUAL STATISTICS API CALLS
