@@ -29,7 +29,7 @@ def image_handler(instance, filename):
 
 def menu_handler(instance, filename):
     ext = filename.split('.')[-1]
-    return "/".join(["menu", '{}.{}'.format(instance.file.name, ext)])
+    return "/".join(["menu", '{}.{}'.format(str(instance.start.day) + str(instance.start.strftime('%b')), ext)])
     
 
 
@@ -54,7 +54,7 @@ class Student(models.Model):
 class Meal(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     type = models.CharField(max_length=5, choices=MEAL_CHOICES)
-    weight = models.CharField(max_length=6)
+    weight = models.CharField(max_length=6, blank=True)
     date = models.DateField()
 
     class Meta:
@@ -66,6 +66,8 @@ class Meal(models.Model):
 
 
 class Announcement(models.Model):
+    heading = models.CharField(max_length=100)
+    issueDate = models.DateField()
     body = models.TextField(blank=True)
     display = models.BooleanField(default=False)
     link = models.URLField(max_length=200, blank=True)
@@ -79,7 +81,9 @@ class Announcement(models.Model):
 class Menu(models.Model):
     file = models.FileField(upload_to=menu_handler)
     start = models.DateField(auto_now=False, default=now)
-    end = models.DateField(auto_now=False, default=now)
 
     def __str__(self):
-        return str(self.start.day) + str(self.start.strftime('%b')) + "-" + str(self.end.day) + str(self.end.strftime('%b')) 
+        return str(self.start.day) + str(self.start.strftime('%b')) 
+    
+    class Meta:
+        ordering = ["start"]

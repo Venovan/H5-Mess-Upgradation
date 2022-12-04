@@ -239,6 +239,22 @@ bool valid_card(){
 
 
 
+String Hex_to_String(byte *buffer, byte bufferSize){
+    String ID = "";
+    String Number = "";
+    for (byte i = 0; i< bufferSize; i++){
+      if (buffer[i] < 0x10){
+        Number = "0" + String(buffer[i], HEX); 
+      }
+      else{
+        Number = String(buffer[i], HEX);
+      }        
+      Number.toUpperCase();
+      ID = ID + Number;
+    }      
+    return ID;
+}
+
 
 
 void LCDprint(String msg, int line){  

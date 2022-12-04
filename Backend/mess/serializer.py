@@ -1,5 +1,5 @@
 from asyncio.windows_events import NULL
-from .models import Meal, Student
+from .models import Meal, Student, Menu, Announcement
 from rest_framework import serializers
 from datetime import datetime
 
@@ -25,7 +25,7 @@ else:
 class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
-        fields = ["name", "permission", "rollNumber", "roomNumber"]
+        fields = "__all__"
 
 
 
@@ -50,7 +50,13 @@ class LoginSerializer(serializers.ModelSerializer):
 
 
 
-class RegisterSerializer(serializers.ModelSerializer):
+class MenuSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Student
-        fields = [""]
+        model = Menu
+        fields = "__all__"
+
+
+class NoticeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Announcement
+        fields = "__all__"

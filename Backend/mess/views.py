@@ -1,10 +1,12 @@
 from asyncio.windows_events import NULL
-from .models import Student, Meal
-from .serializer import LoginSerializer, StudentSerializer
+from .models import Student, Meal, Menu, Announcement
+from .serializer import LoginSerializer, StudentSerializer, MenuSerializer, NoticeSerializer
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime
+from django.db.models import Avg
+
 
 today = str(datetime.now().date())
 hours = datetime.now().hour
@@ -12,9 +14,9 @@ hours = datetime.now().hour
 
 MEAL_TYPE = ''
 
-if hours in range(7, 11):
+if hours in range(7, 12):
     MEAL_TYPE = 'B'
-elif hours in range(11, 16):
+elif hours in range(12, 16):
     MEAL_TYPE = 'L'
 elif hours in range(16, 19):
     MEAL_TYPE = 'S'
@@ -87,7 +89,6 @@ def  login(request, rfid_pin):
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
         
-    
 
 
 
@@ -148,12 +149,23 @@ def  weight(request, rfid_pin):
 @api_view(['GET', 'POST'])
 def app(request, call):
     if request.method == 'GET':
-        if len(call) == 14:     #call format = <ROLLNUMBER><MACHINECODE><PINCODE>
-            if PIN_CODES[int(call[9])] == call[10:]:   
-                ROLL_WAITING[int(call[9])] = call[:9]
+        if call == "validate":
+            if PIN_CODES[int(request.data.get("machine"))] == request.data.get("pincode"):   
+                ROLL_WAITING[int(request.data.get("machine"))] = request.data.get("rollNumber")
                 return Response(status=status.HTTP_202_ACCEPTED)
             else:
                 return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
+                
+        elif call == "menu":
+            menu = Menu.objects.all()
+            serializer = MenuSerializer(menu, many=True)
+            return Response(serializer.data)
+
+        elif call == "notices":
+            notices = Announcement.objects.filter(display = True)
+            serializer = NoticeSerializer(notices, many=True)
+            return Response(serializer.data)
+
         elif len(call) == 9:
             try:
                 student = Student.objects.get(rollNumber = call)
@@ -161,20 +173,34 @@ def app(request, call):
                 return Response(status=status.HTTP_404_NOT_FOUND)
             serializer = StudentSerializer(student)
             return Response(serializer.data)
-        elif call == "menu":
-            pass
-        elif call == "announcements":
-            pass
       
-    elif request.method == "POST":  
-        serializer = StudentSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == "POST":
+        if call == "new": 
+            serializer = StudentSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
-def menu(request):
+def arena(request, call): 
     if request.method == 'GET':
-        pass
+        if call == "dailyTotal":
+            return Response(average_day_waste(request.data.get("date")))
+        elif call == "movingAvg":
+            return Response(moving_avg_waste(request.data.get("start"), request.data.get("end")))
+            pass
+#OVERALL STATISTICS API CALLS
+
+
+def average_day_waste(date):
+    date_avg = Meal.objects.filter(date=date).aggregate(Avg("weight"))
+    return date_avg
+
+def moving_avg_waste(start, end):
+    moving_avg = Meal.objects.filter(date__range = [start, end]).aggregate(Avg("weight"))
+    return moving_avg
+
+
+#INDIVIDUAL STATISTICS API CALLS
