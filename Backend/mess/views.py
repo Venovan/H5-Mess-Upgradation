@@ -184,54 +184,54 @@ def app(request, call):
 @api_view(['GET'])
 def arena(request, call):
     if request.method == 'GET':
+        upto = request.data.get("upto")
+        interval = request.data.get("interval")
+        upto = upto if upto != None else today
+        interval = interval if interval != None else "0"
+        end = datetime(int(upto.split("/")[0]), int(upto.split("/")[1]), int(upto.split("/")[2]))
+        start = end - timedelta(days=int(interval))
+        mealtype = request.data.get("type")
+        student = request.data.get("rollNumber")
+        operation = request.data.get("operation")
+        N = request.data.get("N")
         if call == "dateTotal":
-            return Response(total_day_waste(request.data.get("date"), request.data.get("type")))
+            return Response(total_day_waste(start, end, mealtype))
         elif call == "dateAvg":
-            return Response(average_day_waste(request.data.get("date"), request.data.get("type")))
-        elif call == "dateVar":
-            return Response(variance_date_waste(request.data.get("date"), request.data.get("type")))
+            return Response(average_day_waste(start, end, mealtype))
+        # elif call == "dateVar":
+        #     return Response(variance_date_waste(start, end, mealtype))
         elif call == "movingAvg":
-            end = request.data.get("end")
-            end = datetime(int(end.split("/")[0]), int(end.split("/")[1]), int(end.split("/")[2]))
-            start = end - timedelta(days=int(request.data.get("days")))
-            return Response(moving_avg_waste(start, end, request.data.get("type")))
-        elif call == "myTotal":       #datewise wastage
-            pass
-        elif call == "myVariance":    #deviation from hostel average
-            pass
-        elif call == "myAverage":     #meal wise average waste
-            pass
+            return Response(moving_avg_waste(start, end, mealtype))
+        elif call == "myStats":       #datewise wastage
+            return Response(student_days_total(student, start, end, mealtype, operation))
         elif call == "percentile":    #percentile among low wastage
-            pass
-        elif call == "leaderboard":   #leaderboard
-            pass
+            return Response(percentile(student ,mealtype))
+        elif call == "topN":   #leaderboard
+            return Response(top_N_scorers(N, start, end, mealtype))
 
 
 
 # OVERALL STATISTICS API CALLS
 
-def total_day_waste(date, type=None):
-    date = datetime(int(date.split("/")[0]), int(date.split("/")[1]), int(date.split("/")[2]))
-    print(type)
+def total_day_waste(start, end, type=None):
     if type == None:
-        return Meal.objects.filter(date=date).aggregate(Sum("weight"))
+        return Meal.objects.filter(date__range=[start, end]).aggregate(Sum("weight"))
     else:
-        return Meal.objects.filter(date=date, type=type).aggregate(Sum("weight"))
+        return Meal.objects.filter(date__range=[start, end], type=type).aggregate(Sum("weight"))
 
-def average_day_waste(date, type=None):
-    date = datetime(int(date.split("/")[0]), int(date.split("/")[1]), int(date.split("/")[2]))
-    print(type)
+def average_day_waste(start, end, type=None):
     if type == None:
-        return Meal.objects.filter(date=date).aggregate(Avg("weight"))
+        return Meal.objects.filter(date_range=[start, end]).aggregate(Avg("weight"))
     else:
-        return Meal.objects.filter(date=date, type=type).aggregate(Avg("weight"))
+        return Meal.objects.filter(date__range=[start, end], type=type).aggregate(Avg("weight"))
 
-def variance_date_waste(date, type=None):
-    date = datetime(int(date.split("/")[0]), int(date.split("/")[1]), int(date.split("/")[2]))
+def variance_date_waste(start, end, type=None):
+    print(start)
+    print(end)
     if type == None:
-        return Meal.objects.filter(date=date).aggregate(Variance("weight"))
+        return Meal.objects.filter(date__range=[start, end]).aggregate(Variance("weight"))
     else:
-        return Meal.objects.filter(date=date, type=type).aggregate(Variance("weight"))
+        return Meal.objects.filter(date__range=[start, end], type=type).aggregate(Variance("weight"))
 
 
 def moving_avg_waste(start, end, type=None):
@@ -242,10 +242,49 @@ def moving_avg_waste(start, end, type=None):
 
 
 # INDIVIDUAL STATISTICS API CALLS
+ 
+#returns total food wasted for last x days upto given date "upto"
+def student_days_total(RL, start, end, type=None, operation="Sum"):
+    if RL == None:
+        return status.HTTP_400_BAD_REQUEST
+    if type==None:
+        meals =  Meal.objects.filter(student__rollNumber=RL, date__range = [start, end])
+        if operation == "Sum":
+            return meals.aggregate(Sum("weight"))
+        elif operation =="Avg":
+            return meals.aggregate(Avg("weight"))
+    else:
+        meals =  Meal.objects.filter(student__rollNumber= RL, type=type, date__range = [start, end])
+        if operation == "Sum":
+            return meals.aggregate(Sum("weight"))
+        elif operation =="Avg":
+            return meals.aggregate(Avg("weight"))
 
+def percentile(id,type=None):
+    students = Meal.objects.all().values('student_id').annotate(Avg("weight")).order_by("weight__avg") 
+     
+    totalstudents = students.count()
+   
+    myavg = students.filter(student_id=id).values_list("weight__avg")
+    studentswithmorewaste = students.filter(weight__avg__gte=myavg).count()
 
-def student_days_total(student, upto, days, type=None):
-    end = datetime(int(upto.split("/")[0]), int(upto.split("/")[1]), int(upto.split("/")[2]))
-    start = end - timedelta(days)
-    Meal.objects.filter(student=student, date__range = [])
-    pass
+    percentile = (studentswithmorewaste)*100.0/totalstudents
+    
+    return percentile
+
+def top_N_scorers(N, start, end, type=None):
+    print(start)
+    print(end)
+    if type==None:
+        leaders =  Meal.objects.filter(date__range=[start, end]).values('student__rollNumber', "student__name").annotate(Avg("weight")).order_by("weight__avg") 
+    else:
+        leaders = Meal.objects.filter(date__range=[start, end], type=type).values('student__rollNumber').annotate(Avg("weight")).order_by("weight__avg") 
+    
+    N = len(leaders) if N == None else min(len(leaders), int(N))
+    
+    for each in range(N):
+        del leaders[each]["student__rollNumber"]
+    
+    return leaders[:N]
+
+    

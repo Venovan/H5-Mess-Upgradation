@@ -58,10 +58,10 @@ class Meal(models.Model):
     date = models.DateField()
 
     class Meta:
-        ordering = ["date"]
+        ordering = ["date", "student__rollNumber"]
 
     def __str__(self):
-        return self.student.rollNumber + "/" + str(self.date) + "/" + self.type
+        return self.student.rollNumber + "/" + str(self.date) + "/" + self.type + "/" + self.weight
 
 
 
