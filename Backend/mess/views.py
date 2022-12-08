@@ -13,13 +13,13 @@ hours = datetime.now().hour
 
 MEAL_TYPE = ''
 
-if hours in range(7, 12):
+if hours in range(6, 12):
     MEAL_TYPE = 'B'
-elif hours in range(12, 16):
+elif hours in range(12, 18):
     MEAL_TYPE = 'L'
-elif hours in range(16, 19):
+elif hours in range(18, 0):
     MEAL_TYPE = 'S'
-elif hours in range(0, 23):
+elif hours in range(0, 6):
     MEAL_TYPE = 'D'
 else:
     MEAL_TYPE = None
@@ -32,13 +32,13 @@ ROLL_WAITING = [None, None, None]
 @api_view(['GET', 'PATCH'])
 def register(request, rfid_pin):
     if request.method == 'GET':
-        if len(rfid_pin) == 4:
-            PIN_CODES[0] = rfid_pin
+        if rfid_pin == "pin":
+            PIN_CODES[0] = request.GET["code"]
             return Response(status=status.HTTP_202_ACCEPTED)
-        elif len(rfid_pin) == 8:
+        elif rfid_pin == "card":
             if ROLL_WAITING[0] != None:
                 student = Student.objects.get(rollNumber=ROLL_WAITING[0])
-                student.RFID = rfid_pin
+                student.RFID = request.GET["rfid"]
                 student.save()
                 ROLL_WAITING[0] == None
                 return Response(status=status.HTTP_423_LOCKED)
@@ -49,107 +49,80 @@ def register(request, rfid_pin):
 @api_view(['GET'])
 def login(request, rfid_pin):
     if request.method == 'GET':
-        if len(rfid_pin) == 4:
-            PIN_CODES[1] = rfid_pin
+        if rfid_pin == "pin":
+            PIN_CODES[1] = request.GET["code"]
             return Response(status=status.HTTP_202_ACCEPTED)
 
-        elif len(rfid_pin) == 8:
+        elif rfid_pin == "recognise":
             try:
-                student = Student.objects.get(RFID=rfid_pin)
-                if (student.permission == 'NA'):
-                    return Response(student.name, status=status.HTTP_403_FORBIDDEN)
-                elif (Meal.objects.filter(student=student, type=MEAL_TYPE, date=datetime.now().date()).exists()):
-                    return Response(student.name, status=status.HTTP_208_ALREADY_REPORTED)
-                else:
-                    meal = Meal(student=student, type=MEAL_TYPE,
-                                weight="", date=datetime.now().date())
-                    meal.save()
-                    return Response(student.name, status=status.HTTP_200_OK)
-            except Student.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
-
-        elif rfid_pin == "update":
-            if (ROLL_WAITING[1] != None):
-                roll = ROLL_WAITING[1]
+                RFID = request.GET["rfid"]
+            except:
+                RFID = None
+            if RFID == None:
+                RFID =  ROLL_WAITING[1]
                 ROLL_WAITING[1] = None
+            if RFID != None:
                 try:
-                    student = Student.objects.get(rollNumber=roll)
+                    student = Student.objects.get(RFID=RFID)
                     if (student.permission == 'NA'):
                         return Response(student.name, status=status.HTTP_403_FORBIDDEN)
                     elif (Meal.objects.filter(student=student, type=MEAL_TYPE, date=datetime.now().date()).exists()):
                         return Response(student.name, status=status.HTTP_208_ALREADY_REPORTED)
                     else:
-                        meal = Meal(student=student, type=MEAL_TYPE,
-                                    weight="", date=datetime.now().date())
+                        meal = Meal(student=student, type=MEAL_TYPE, weight=None, date=datetime.now().date())
                         meal.save()
                         return Response(student.name, status=status.HTTP_201_CREATED)
                 except Student.DoesNotExist:
                     return Response(status=status.HTTP_404_NOT_FOUND)
-            else:
-                return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
 
 
 @api_view(['GET'])
 def weight(request, rfid_pin):
     if request.method == 'GET':
-        if len(rfid_pin) == 4:
-            PIN_CODES[2] = rfid_pin
+        if rfid_pin == "pin":
+            PIN_CODES[2] = request.GET["code"]
             return Response(status=status.HTTP_202_ACCEPTED)
 
-        elif len(rfid_pin) == 8:
+        elif rfid_pin == "recognise":
             try:
-                student = Student.objects.get(rollNumber=rfid_pin)
-                try:
-                    meal = Meal.objects.get(
-                        student=student, type=MEAL_TYPE, date=datetime.now().date())
-                    meal.weight = None
-                    meal.save()
-                    return Response(status=status.HTTP_100_CONTINUE)
-                except Meal.DoesNotExist:
-                    return Response(status=status.HTTP_206_PARTIAL_CONTENT)
-            except Student.DoesNotExist:
-                return Response(status=status.HTTP_404_NOT_FOUND)
-
-        elif rfid_pin == "update":
-            if (ROLL_WAITING[2] != None):
-                roll = ROLL_WAITING[2]
+                RFID = request.GET["rfid"]
+            except:
+                RFID = None
+            if RFID == None:
+                RFID =  ROLL_WAITING[2]
                 ROLL_WAITING[2] = None
-                print(roll)
-                try:
-                    student = Student.objects.get(rollNumber=roll)
+            if RFID != None:
+                if (Student.objects.filter(RFID=RFID).exists()):
                     try:
-                        meal = Meal.objects.get(
-                            student=student, type=MEAL_TYPE, date=datetime.now().date())
-                        meal.weight = None
-                        meal.save()
-                        return Response(status=status.HTTP_100_CONTINUE)
+                        meal = Meal.objects.get(student__RFID=RFID, type=MEAL_TYPE, date=datetime.now().date())
+                        if (meal.weight == None):
+                            return Response(RFID, status=status.HTTP_202_ACCEPTED)
+                        else:
+                            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
                     except Meal.DoesNotExist:
                         return Response(status=status.HTTP_206_PARTIAL_CONTENT)
-                except Student.DoesNotExist:
+                else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
             else:
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
-        elif len(rfid_pin) == 5:
-            weight = rfid_pin[len(rfid_pin) -
-                              rfid_pin[::-1].find("0"):]  # in grams
-            try:
-                meal = Meal.objects.get(
-                    student=student, type=MEAL_TYPE, date=datetime.now().date())
-                meal.weight = weight
-                meal.save()
-                ROLL_WAITING[2] == None
-            except:
-                Response(status=status.HTTP_409_CONFLICT)
-
+        elif rfid_pin == "update":
+            meal = Meal.objects.get(student__RFID=request.GET["rfid"], type=MEAL_TYPE, date=datetime.now().date())
+            meal.weight = request.GET["weight"]
+            meal.save()
+            return Response(status=status.HTTP_423_LOCKED)
+        
 
 @api_view(['GET', 'POST'])
 def app(request, call):
     if request.method == 'GET':
         if call == "validate":
-            if PIN_CODES[int(request.data.get("machine"))] == request.data.get("pincode"):
-                ROLL_WAITING[int(request.data.get("machine"))
-                             ] = request.data.get("rollNumber")
+            if PIN_CODES[int(request.data.get("machine"))] == request.data.get("code"):
+                ROLL_WAITING[int(request.data.get("machine"))] = request.data.get("rfid")
                 return Response(status=status.HTTP_202_ACCEPTED)
             else:
                 return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
@@ -226,8 +199,6 @@ def average_day_waste(start, end, type=None):
         return Meal.objects.filter(date__range=[start, end], type=type).aggregate(Avg("weight"))
 
 def variance_date_waste(start, end, type=None):
-    print(start)
-    print(end)
     if type == None:
         return Meal.objects.filter(date__range=[start, end]).aggregate(Variance("weight"))
     else:
@@ -273,8 +244,6 @@ def percentile(id,type=None):
     return percentile
 
 def top_N_scorers(N, start, end, type=None):
-    print(start)
-    print(end)
     if type==None:
         leaders =  Meal.objects.filter(date__range=[start, end]).values('student__rollNumber', "student__name").annotate(Avg("weight")).order_by("weight__avg") 
     else:

@@ -41,9 +41,10 @@ byte nuidPICC[4];
 
 
 //HX711 declaration
-#define DOUT 5
-#define CLK 6
-//HX711 scale(DOUT, CLK);
+#define DOUT 16
+#define CLK 25
+
+HX711 scale(DOUT, CLK);
 
 
 //LCD declarations
@@ -54,15 +55,24 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 //Variable declarations
 int Pincode;
 int httpResponseCode;
-
+long calibrationFactor;
+float knownWeight = 100;
 
 void setup() {
   Serial.begin(115200);
   
   //setup for HX711
   //pinMode(reset, INPUT_PULLUP);
-  //scale.set_scale();
-  //scale.tare();
+  scale.set_scale();
+  scale.tare();
+  Serial.println("Place a known weight");
+  delay(5000);
+  
+  long reading = scale.get_units(10);
+  calibrationFactor = reading/knownWeight;
+
+  scale.set_scale(calibrationFactor);
+  scale.tare();
   
   
   // setup for RC522
@@ -125,6 +135,16 @@ void loop(){
     
     while(true){
       LCDprint("Tap ID/Use pin", 1); 
+
+      if (valid_card()){
+        card = Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+        LCDprint(card, 0);
+        LCDprint("Valid Card Found", 1);              
+      }
+      else{
+        card = "";
+      }
+          
       if (valid_card()){        
         Serial.println("Valid Card Found");   
         LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
@@ -164,7 +184,9 @@ void loop(){
         }
         break;                 
       }
-      serverpath = serverName + "update";
+
+      
+      serverpath = serverName + "recognise?RFID=" + card;
       http.begin(serverpath.c_str());
       httpResponseCode = http.GET();
       Serial.println("Sent data");
