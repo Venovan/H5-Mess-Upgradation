@@ -74,6 +74,8 @@ def login(request, rfid_pin):
                         return Response(student.name, status=status.HTTP_201_CREATED)
                 except Student.DoesNotExist:
                     return Response(status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 
@@ -102,9 +104,9 @@ def weight(request, rfid_pin):
                         if (meal.weight == None):
                             return Response(RFID, status=status.HTTP_202_ACCEPTED)
                         else:
-                            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+                            return Response(Student.objects.get(RFID=RFID).name, status=status.HTTP_405_METHOD_NOT_ALLOWED)
                     except Meal.DoesNotExist:
-                        return Response(status=status.HTTP_206_PARTIAL_CONTENT)
+                        return Response(Student.objects.get(RFID=RFID).name, status=status.HTTP_206_PARTIAL_CONTENT)
                 else:
                     return Response(status=status.HTTP_404_NOT_FOUND)
             else:
@@ -114,7 +116,7 @@ def weight(request, rfid_pin):
             meal = Meal.objects.get(student__RFID=request.GET["rfid"], type=MEAL_TYPE, date=datetime.now().date())
             meal.weight = request.GET["weight"]
             meal.save()
-            return Response(status=status.HTTP_423_LOCKED)
+            return Response(Student.objects.get(RFID-RFID).name, status=status.HTTP_423_LOCKED)
         
 
 @api_view(['GET', 'POST'])

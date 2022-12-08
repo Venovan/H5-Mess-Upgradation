@@ -57,6 +57,7 @@ int Pincode;
 int httpResponseCode;
 long calibrationFactor;
 float knownWeight = 100;
+String extent;
 
 void setup() {
   Serial.begin(115200);
@@ -120,7 +121,7 @@ void loop(){
   
   if (WiFi.status()==WL_CONNECTED){
     HTTPClient http;
-    String serverpath = serverName + String(Pincode);
+    String serverpath = serverName + "pin?code=" +String(Pincode);
     Serial.println(serverpath);
     http.begin(serverpath.c_str());
     httpResponseCode = http.GET();
@@ -137,97 +138,68 @@ void loop(){
       LCDprint("Tap ID/Use pin", 1); 
 
       if (valid_card()){
-        card = Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
-        LCDprint(card, 0);
-        LCDprint("Valid Card Found", 1);              
-      }
-      else{
-        card = "";
-      }
-          
-      if (valid_card()){        
         Serial.println("Valid Card Found");   
         LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
-        LCDprint("Valid Card Found", 1);
-        delay(1000);
-        serverpath = serverName + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
-        http.begin(serverpath.c_str());
-        switch(httpResponseCode = http.GET()){
-          case 403:
-          {
-            String payload = http.getString();
-            LCDprint("Sorry, " + payload, 0);
-            LCDprint("Meal Forbidden", 1);
-            break;   
-          }                           
-          case 200:
-          {
-            String payload =  http.getString();
-            LCDprint("Hii, " + payload, 0);
-            LCDprint("Take Your Plate", 1);                    
-            break;
-          }                      
-          case 208:
-          {           
-            String payload = http.getString();
-            LCDprint("Hii, " + payload, 0); 
-            LCDprint("Already Taken", 0);
-            break;
-          }
-          case 404:
-          {         
-            LCDprint("Not Registered", 0);
-            break;
-          }
-          default:
-            LCDprint("Unknown Response", 0);                              
-        }
-        break;                 
+        LCDprint("Valid Card Found", 1);       
+        extent = "?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+      }
+      else{
+        extent= "";
       }
 
-      
-      serverpath = serverName + "recognise?RFID=" + card;
+      serverpath = serverName + extent;
       http.begin(serverpath.c_str());
-      httpResponseCode = http.GET();
-      Serial.println("Sent data");
-      if (httpResponseCode == 204){
-        Serial.println("204 no content");        
-        continue;
-      }
-      switch(httpResponseCode){                     
-        case 403:
+      switch (httpResponseCode = http.GET()){
+        case 204:
+        {
+          continue;                    
+        }
+        case 404:
+        {
+          LCDprint("Not Registered", 0);
+          break;          
+        }
+        case 206:
+        {
+          String payload = http.getString();
+          LCDprint("Hello, " + payload, 0);
+          LCDprint("No Meal Taken", 1);
+          break;                                        
+        }
+        case 405:
         {
           String payload = http.getString();
           LCDprint("Sorry, " + payload, 0);
-          LCDprint("Meal Forbidden", 1); 
-          break; 
-        }                 
-        case 200:
+          LCDprint("Already Weighed", 1);   
+          break;       
+        }
+        case 202:
         {
-          String payload =  http.getString();
-          LCDprint("Hii, " + payload, 0);
-          LCDprint("Take Your Plate", 1);                    
-          break;
-        }
-        case 208:
-        {        
-          String payload = http.getString();
-          LCDprint("Hii, " + payload, 0); 
-          LCDprint("Already Taken", 0);
-          break;
-        }
-        case 404: 
-        {                  
-          LCDprint("Not Registered", 0);
-        }  
+          String payload =http.getString();
+          LCDprint("Weigh your plate", 0);
+          while (scale.get_units(5) < 10){
+            LCDprint("waiting...", 0);             
+          }
+          String weight = String(scale.get_units(5));
+          LCDprint("weight: " + weight, 0);
+          delay(1000);
+          LCDprint("sending...", 1);
+          delay(1000);          
+          serverpath = serverName + "update?rfid=" + payload + "&weight=" + weight;  
+          http.begin(serverpath.c_str());
+          if (httpResponseCode == 423){
+            String payload = http.getString();            
+            LCDprint("Yay!, " + payload, 0);          
+            LCDprint("Weight Updated", 1);
+          }
+        } 
         default:
-          LCDprint("Unknown Response", 0);                              
+          LCDprint("Unknown Response", 0);                  
       }
-      break;                 
+      break;      
     }
   }
-}      
-
+}
 
 bool valid_card(){
     //not valid if no card is nearby

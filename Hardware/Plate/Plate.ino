@@ -26,7 +26,7 @@ const char* ssid = "Samsung M31";
 const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.100.81:8000/mess/plate/";
+String serverName = "http://192.168.100.81:8000/mess/login/";
 
 
 
@@ -48,7 +48,7 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 //Variable declarations
 int Pincode;
 int httpResponseCode;
-
+String extent;
 
 void setup() {
   Serial.begin(115200);
@@ -104,7 +104,7 @@ void loop(){
   
   if (WiFi.status()==WL_CONNECTED){
     HTTPClient http;
-    String serverpath = serverName + String(Pincode);
+    String serverpath = serverName + "pin?code=" + String(Pincode);
     Serial.println(serverpath);
     http.begin(serverpath.c_str());
     httpResponseCode = http.GET();
@@ -119,85 +119,57 @@ void loop(){
     
     while(true){
       LCDprint("Tap ID/Use pin", 1); 
-      if (valid_card()){        
+      
+      if (valid_card()){
         Serial.println("Valid Card Found");   
         LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
-        LCDprint("Valid Card Found", 1);
-        delay(1000);
-        serverpath = serverName + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
-        http.begin(serverpath.c_str());
-        switch(httpResponseCode = http.GET()){
-          case 403:
-          {
-            String payload = http.getString();
-            LCDprint("Sorry, " + payload, 0);
-            LCDprint("Meal Forbidden", 1);
-            break;   
-          }                           
-          case 200:
-          {
-            String payload =  http.getString();
-            LCDprint("Hii, " + payload, 0);
-            LCDprint("Take Your Plate", 1);                    
-            break;
-          }                      
-          case 208:
-          {           
-            String payload = http.getString();
-            LCDprint("Hii, " + payload, 0); 
-            LCDprint("Already Taken", 0);
-            break;
-          }
-          case 404:
-          {         
-            LCDprint("Not Registered", 0);
-            break;
-          }
-          default:
-            LCDprint("Unknown Response", 0);                              
-        }
-        break;                 
+        LCDprint("Valid Card Found", 1);       
+        extent = "?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
       }
-      serverpath = serverName + "update";
+      else{
+        extent= "";
+      }
+      
+      serverpath = serverName + extent;
       http.begin(serverpath.c_str());
-      httpResponseCode = http.GET();
-      if (httpResponseCode == 204){    
-        continue;
-      }
-      switch(httpResponseCode){                     
+      switch (httpResponseCode = http.GET()){
+        case 204:
+        {
+          continue;                    
+        }
+        case 404:
+        {
+          LCDprint("Not Registered", 0);
+          break;          
+        }
         case 403:
         {
           String payload = http.getString();
           LCDprint("Sorry, " + payload, 0);
-          LCDprint("Meal Forbidden", 1); 
-          break; 
-        }                 
-        case 200:
+          LCDprint("Meal Forbidden", 1);   
+          break;       
+        }
+        case 208:
+        {
+          String payload = http.getString();
+          LCDprint("Hii, " + payload, 0); 
+          LCDprint("Already Taken", 0);
+          break;          
+        } 
+        case 201:
         {
           String payload =  http.getString();
           LCDprint("Hii, " + payload, 0);
           LCDprint("Take Your Plate", 1);                    
-          break;
+          break;       
         }
-        case 208:
-        {        
-          String payload = http.getString();
-          LCDprint("Hii, " + payload, 0); 
-          LCDprint("Already Taken", 0);
-          break;
-        }
-        case 404: 
-        {                  
-          LCDprint("Not Registered", 0);
-        }  
         default:
-          LCDprint("Unknown Response", 0);                              
+          LCDprint("Unknown Response", 0);                  
       }
-      break;                 
+      break;      
     }
   }
-}      
-
+}
 
 bool valid_card(){
     //not valid if no card is nearby
