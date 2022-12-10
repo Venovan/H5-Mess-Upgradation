@@ -5,7 +5,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
 from django.db.models import Avg, Sum, Variance
-import numpy as np
+import H5Mess.settings as settings
+import requests
+import base64
+import json
 
 today = str(datetime.now().date())
 hours = datetime.now().hour
@@ -27,6 +30,29 @@ else:
 
 PIN_CODES = [None, None, None]
 ROLL_WAITING = [None, None, None]
+
+@api_view(['POST'])
+def sso_login(request):
+    access_code = request.data.get("access_code")
+    token_exchange_response = requests.post(url=settings.TOKEN_EXCHANGE_URL,
+                                            headers={
+                                                "Authorization": "Basic {}".format(base64.b64encode("{}:{}".format(settings.CLIENT_ID, settings.CLIENT_SECRET).encode('ascii')).decode('ascii')),
+                                                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                                            },
+                                            data="code={}&redirect_uri={}&grant_type=authorization_code".format(access_code, settings.REDIRECT_URI),)
+    token_exchanage = token_exchange_response.json()
+    access_token = token_exchanage.get("access_token")
+    resources_response = requests.get(url=settings.RESOURCES_URL, headers={
+        "Authorization": "Bearer {}".format(access_token),
+    },)
+    resources = resources_response.json()
+    roll_number = resources.get("roll_number")
+    name = "{} {}".format(resources.get("first_name"),
+                          resources.get("last_name"))
+    student, _ = Student.objects.get_or_create(
+        name=name, rollNumber=roll_number)
+    result = StudentSerializer(student)
+    return Response(result.data)
 
 
 @api_view(['GET', 'PATCH'])
