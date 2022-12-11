@@ -1,15 +1,16 @@
 from .models import Student, Meal, Menu, Announcement
 from .serializer import LoginSerializer, StudentSerializer, MenuSerializer, NoticeSerializer
 from rest_framework.decorators import api_view
+from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
 from django.db.models import Avg, Sum, Variance
 import H5Mess.settings as settings
+from rest_framework.parsers import FormParser, MultiPartParser
 import numpy as np
 import requests
 import base64
-import json
 
 today = str(datetime.now().date())
 hours = datetime.now().hour
@@ -36,6 +37,7 @@ ROLL_WAITING = [None, None, None]
 @api_view(['POST'])
 def sso_login(request):
     access_code = request.data.get("access_code")
+    print("ACCESS CODE", access_code)
     token_exchange_response = requests.post(url=settings.TOKEN_EXCHANGE_URL,
                                             headers={
                                                 "Authorization": "Basic {}".format(base64.b64encode("{}:{}".format(settings.CLIENT_ID, settings.CLIENT_SECRET).encode('ascii')).decode('ascii')),
@@ -43,18 +45,36 @@ def sso_login(request):
                                             },
                                             data="code={}&redirect_uri={}&grant_type=authorization_code".format(access_code, settings.REDIRECT_URI),)
     token_exchanage = token_exchange_response.json()
+    print("TOKEN EXCHANGE RESPONSE", token_exchanage)
     access_token = token_exchanage.get("access_token")
     resources_response = requests.get(url=settings.RESOURCES_URL, headers={
         "Authorization": "Bearer {}".format(access_token),
     },)
     resources = resources_response.json()
+    print(resources)
     roll_number = resources.get("roll_number")
     name = "{} {}".format(resources.get("first_name"),
                           resources.get("last_name"))
     student, _ = Student.objects.get_or_create(
         name=name, rollNumber=roll_number)
-    result = StudentSerializer(student)
+    result = StudentSerializer(student, context={"request": request})
     return Response(result.data)
+
+
+@api_view(['POST'])
+def update(request):
+    rollNumber = request.data.get("rollNumber")
+    roomNumber = request.data.get("roomNumber")
+    print(rollNumber, roomNumber)
+    student = Student.objects.get(rollNumber=rollNumber)
+    student.roomNumber = roomNumber
+    if len(dict(request.FILES)) > 0 and "file" in dict(request.FILES).keys():
+        print("CONTAINS IMAGE")
+        student.photo = request.FILES["file"]
+    student.save()
+    return Response({
+        "messge": "Updated successfully",
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -62,7 +82,7 @@ def get_student(request):
     roll_number = request.headers.get("rollNumber")
     if Student.objects.filter(rollNumber=roll_number).exists():
         student = Student.objects.get(rollNumber=roll_number)
-        result = StudentSerializer(student)
+        result = StudentSerializer(student, context={"request": request})
         return Response(result.data)
     else:
         return Response({"message": "No student with the matching roll number"})
@@ -185,15 +205,7 @@ def weight(request, rfid_pin):
 @api_view(['GET', 'POST'])
 def app(request, call):
     if request.method == 'GET':
-        if call == "validate":
-            if PIN_CODES[int(request.data.get("machine"))] == request.data.get("pincode"):
-                ROLL_WAITING[int(request.data.get("machine"))
-                             ] = request.data.get("rollNumber")
-                return Response(status=status.HTTP_202_ACCEPTED)
-            else:
-                return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
-
-        elif call == "menu":
+        if call == "menu":
             menu = Menu.objects.all()
             serializer = MenuSerializer(menu, many=True)
             return Response(serializer.data)
@@ -208,7 +220,8 @@ def app(request, call):
                 student = Student.objects.get(rollNumber=call)
             except Student.DoesNotExist:
                 return Response(status=status.HTTP_404_NOT_FOUND)
-            serializer = StudentSerializer(student)
+            serializer = StudentSerializer(
+                student, context={"request": request})
             return Response(serializer.data)
 
     elif request.method == "POST":
@@ -218,6 +231,14 @@ def app(request, call):
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        elif call == "validate":
+            if PIN_CODES[int(request.data.get("machine"))] == request.data.get("pincode"):
+                ROLL_WAITING[int(request.data.get("machine"))
+                             ] = request.data.get("rollNumber")
+                return Response(status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
 
 
 @api_view(['GET'])

@@ -22,6 +22,13 @@ else:
 
 
 class StudentSerializer(serializers.ModelSerializer):
+    photo = serializers.SerializerMethodField()
+
+    def get_photo(self, student):
+        request = self.context.get('request')
+        photo_url = student.photo.url
+        return request.build_absolute_uri(photo_url)
+
     class Meta:
         model = Student
         fields = "__all__"
