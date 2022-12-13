@@ -33,6 +33,7 @@ String serverName = "http://192.168.100.81:8000/mess/weight/";
 //RFID decalarations
 #define SS_PIN 5
 #define RST_PIN 27
+#define WEIGHT_THR 30
  
 MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
 
@@ -176,21 +177,40 @@ void loop(){
         case 202:
         {
           String payload =http.getString();
-          LCDprint("Weigh your plate", 0);
-          while (scale.get_units(5) < 10){
-            LCDprint("waiting...", 0);             
+          int weight = weighing(payload);   
+          if (weight == -1){
+              LCDprint("Weighing failed", 0);
+              LCDprint("Try again!", 1);
+              serverpath = serverName + "update";
           }
-          String weight = String(scale.get_units(5));
-          LCDprint("weight: " + weight, 0);
-          delay(1000);
-          LCDprint("sending...", 1);
-          delay(1000);          
-          serverpath = serverName + "update?rfid=" + payload + "&weight=" + weight;  
+          else{    
+            serverpath = serverName + "update?weight=" + String(weight);  
+          }          
           http.begin(serverpath.c_str());
-          if (httpResponseCode == 423){
-            String payload = http.getString();            
-            LCDprint("Yay!, " + payload, 0);          
-            LCDprint("Weight Updated", 1);
+          switch(httpResponseCode = http.GET()){
+            case 204:
+            {
+              LCDprint("No Content", 1);  
+              delay(500);            
+              break;
+            }
+            case 205:
+            {
+              LCDprint("try again", 1);
+              delay(500;)
+              break;
+            }
+            case 423:
+            {
+              LCDprint("Weight updated", 1); 
+              delay(500);             
+              break;
+            }
+            default:
+            {
+              LCDprint("Unknown Response", 0);
+            }
+          break;
           }
         } 
         default:
@@ -256,6 +276,25 @@ String Hex_to_String(byte *buffer, byte bufferSize){
     }      
     return ID;
 }
+
+float weighing(String name){
+  LCDprint("Hii! " + name, 0);
+  LCDprint("weigh your plate", 1);
+  delay(1000);
+  for (int i=0; i<5; i++0){
+    if (scale.get_units(5) < WEIGHT_THR){
+      LCDprint("waiting!", 1);
+      delay(500);
+      LCDprint("  ", 1);
+      continue;
+    }
+    float reading = get_units(2));
+    LCDprint("weight: " + readings + "gms", 1);  
+    return reading;   
+  }
+  return 0;
+}
+
 
 void LCDprint(String msg, int line){  
     int len = msg.length();

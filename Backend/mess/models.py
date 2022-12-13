@@ -54,7 +54,7 @@ class Student(models.Model):
 class Meal(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     type = models.CharField(max_length=5, choices=MEAL_CHOICES)
-    weight = models.CharField(max_length=6, blank=True)
+    weight = models.CharField(max_length=6, blank=True, null=True)
     date = models.DateField()
 
     class Meta:
