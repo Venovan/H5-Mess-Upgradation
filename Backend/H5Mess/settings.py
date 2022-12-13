@@ -14,8 +14,8 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-MEDIA_ROOT = "mess/media/"
-MEDIA_URL = ""
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = "/media/"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
@@ -28,7 +28,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = [".ngrok.io", "127.0.0.1", "localhost", "192.168.100.81"]
 DATE_INPUT_FORMATS = ['%d-%m-%Y']
-CSRF_TRUSTED_ORIGINS = ["https://6af0-2409-4081-9d8a-99b8-801-72dd-c2ec-1f8d.in.ngrok.io", "http://127.0.0.1:8000/admin/"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://6af0-2409-4081-9d8a-99b8-801-72dd-c2ec-1f8d.in.ngrok.io", "http://127.0.0.1:8000/admin/"]
 
 
 # Application definition
@@ -111,7 +112,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Kolkata"
 
 USE_I18N = True
 
@@ -127,3 +128,11 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# SSO APP KEYS
+CLIENT_ID = "pPu5URA8fUoPtafbsZ7NOQEtndBKzGas2yFGBCEq"
+CLIENT_SECRET = "9bm1gaSJJiVGQ099ILozC3p0omiJZInZ8FWvN9F5ZEe7orAIomi0WSU7ifBZKd1KrbRwS3ZtjPQNDHs2Kz4a1GsCunpGrAJjBcGKG9yNJBEQ0ESVi6EbFeRLn8zgaSXQ"
+REDIRECT_URI = "https://gymkhana.iitb.ac.in/~hostel5/"
+
+# SSO API URlS
+TOKEN_EXCHANGE_URL = "https://gymkhana.iitb.ac.in/profiles/oauth/token/"
+RESOURCES_URL = "https://gymkhana.iitb.ac.in/profiles/user/api/user/?fields=id,first_name,last_name,username,roll_number"
