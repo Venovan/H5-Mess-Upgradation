@@ -187,11 +187,25 @@ def weight(request, rfid_pin):
 @api_view(['GET', 'POST'])
 def app(request, call):
     if request.method == 'GET':
+        if call == "meal":
+            rollNumber = request.headers.get("rollNumber")
+            student = Student.objects.get(rollNumber=rollNumber)
+            if Meal.objects.filter(student=student, type=get_meal_type(), date=datetime.today()).exists():
+                meal = Meal.objects.get(
+                    student=student, type=get_meal_type(), date=datetime.today())
+                result = MealSerializer(meal)
+                return Response({
+                    "message": result.data
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"message": "Not Found"}, status=status.HTTP_204_NO_CONTENT)
+
         if call == "status":
-            waiting = request.data.get("rollNumber")
+            rollNumber = request.data.get("rollNumber")
+            student = Student.objects.get(rollNumber=rollNumber)
             meal = Meal.objects.get(
-                student__RFID=waiting, type=get_meal_type(), date=datetime.now().date())
-            if (ROLL_WAITING[2] == waiting):
+                student=student, type=get_meal_type(), date=datetime.now().date())
+            if (ROLL_WAITING[2] == rollNumber):
                 return Response(status=status.HTTP_425_TOO_EARLY)
             elif (meal.weight == None):
                 return Response(status=status.HTTP_205_RESET_CONTENT)
@@ -226,12 +240,11 @@ def app(request, call):
             print(PIN_CODES[int(request.data.get("machine"))]
                   == request.data.get("code"))
             if PIN_CODES[int(request.data.get("machine"))] == request.data.get("code"):
-                PIN_CODES[int(request.data.get("machine"))] = None
                 if (request.data.get("machine") == "1"):
                     print("reached")
                     try:
                         student = Student.objects.get(
-                            RFID=request.data.get("rollNumber"))
+                            rollNumber=request.data.get("rollNumber"))
                         if (student.permission == 'NA'):
                             return Response({
                                 "message": "Permission Denied"
@@ -253,14 +266,14 @@ def app(request, call):
                     except Student.DoesNotExist:
                         return Response(status=status.HTTP_404_NOT_FOUND)
                 elif (request.data.get("machine") == "2"):
-                    RFID = request.data.get("rollNumber")
+                    rollNumber = request.data.get("rollNumber")
                     try:
-                        student = Student.objects.filter(RFID=RFID)
+                        student = Student.objects.filter(rollNumber=rollNumber)
                         try:
                             meal = Meal.objects.get(
-                                student__RFID=RFID, type=get_meal_type(), date=datetime.now().date())
+                                student=student, type=get_meal_type(), date=datetime.now().date())
                             if (meal.weight == None):
-                                ROLL_WAITING[2] = RFID
+                                ROLL_WAITING[2] = rollNumber
                                 return Response(status=status.HTTP_202_ACCEPTED)
                             else:
                                 return Response(student.name, status=status.HTTP_405_METHOD_NOT_ALLOWED)
