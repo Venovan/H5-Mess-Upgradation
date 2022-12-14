@@ -197,7 +197,7 @@ void loop(){
             case 205:
             {
               LCDprint("try again", 1);
-              delay(500;)
+              delay(500);
               break;
             }
             case 423:
@@ -277,23 +277,26 @@ String Hex_to_String(byte *buffer, byte bufferSize){
     return ID;
 }
 
+
+
 float weighing(String name){
   LCDprint("Hii! " + name, 0);
   LCDprint("weigh your plate", 1);
   delay(1000);
-  for (int i=0; i<5; i++0){
+  for (int i=0; i<5; i++){
     if (scale.get_units(5) < WEIGHT_THR){
       LCDprint("waiting!", 1);
       delay(500);
       LCDprint("  ", 1);
       continue;
     }
-    float reading = get_units(2));
-    LCDprint("weight: " + readings + "gms", 1);  
-    return reading;   
+    float reading = scale.get_units(2);
+    LCDprint("weight: " + String(reading) + "gms", 1); 
+    return reading;
   }
   return 0;
 }
+
 
 
 void LCDprint(String msg, int line){  
