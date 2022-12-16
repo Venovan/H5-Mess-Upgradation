@@ -28,6 +28,14 @@ PIN_CODES = [None, None, None]
 ROLL_WAITING = [None, None, None]
 
 
+@api_view(['GET'])
+def get_status(request):
+    return Response({
+        "roll_waiting": ROLL_WAITING,
+        "pin_codes": PIN_CODES
+    })
+
+
 @api_view(['POST'])
 def sso_login(request):
     access_code = request.data.get("access_code")
@@ -76,10 +84,16 @@ def get_student(request):
     roll_number = request.headers.get("rollNumber")
     if Student.objects.filter(rollNumber=roll_number).exists():
         student = Student.objects.get(rollNumber=roll_number)
+        meal_data = {}
+        if Meal.objects.filter(student=student, date=datetime.today(), type=get_meal_type()).exists():
+            meal_obj = Meal.objects.get(
+                student=student, date=datetime.today(), type=get_meal_type())
+            meal = MealSerializer(meal_obj)
+            meal_data = meal.data
         result = StudentSerializer(student, context={"request": request})
-        return Response(result.data)
+        return Response({"student": result.data, "meal": meal_data}, status=status.HTTP_200_OK)
     else:
-        return Response({"message": "No student with the matching roll number"})
+        return Response({"message": "No student with the matching roll number"}, status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['GET', 'PATCH'])
@@ -165,21 +179,22 @@ def weight(request, rfid_pin):
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
         elif rfid_pin == "update":
-            try:
-                weight = request.GET["weight"]
-            except:
-                weight = None
-            if weight == None:
+            weight = request.GET["weight"]
+            print(weight)
+            print(ROLL_WAITING)
+            if weight is None:
                 ROLL_WAITING[2] = None
                 return Response(status=status.HTTP_205_RESET_CONTENT)
             elif ROLL_WAITING[2] != None:
                 RFID = ROLL_WAITING[2]
-                ROLL_WAITING[2] = None
+                print(RFID)
+                student = Student.objects.get(rollNumber=RFID)
                 meal = Meal.objects.get(
-                    student__RFID=RFID, type=get_meal_type(), date=datetime.now().date())
+                    student=student, type=get_meal_type(), date=datetime.today())
+                ROLL_WAITING[2] = None
                 meal.weight = request.GET["weight"]
                 meal.save()
-                return Response(Student.objects.get(RFID=RFID).name, status=status.HTTP_423_LOCKED)
+                return Response(Student.objects.get(rollNumber=RFID).name, status=status.HTTP_423_LOCKED)
             else:
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -200,7 +215,7 @@ def app(request, call):
             else:
                 return Response({"message": "Not Found"}, status=status.HTTP_204_NO_CONTENT)
 
-        if call == "status":
+        """ if call == "status":
             rollNumber = request.data.get("rollNumber")
             student = Student.objects.get(rollNumber=rollNumber)
             meal = Meal.objects.get(
@@ -213,7 +228,20 @@ def app(request, call):
                 result = MealSerializer(meal)
                 return Response({
                     "message": result.data
-                }, status=status.HTTP_202_ACCEPTED)
+                }, status=status.HTTP_202_ACCEPTED) """
+
+        if call == "status":
+            id = int(request.headers.get("id"))
+            if Meal.objects.filter(id=id).exists():
+                meal = Meal.objects.get(id=id)
+                result = MealSerializer(meal)
+                return Response({
+                    "message": result.data
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response({
+                    "message": "No meal with this id"
+                }, status=status.HTTP_204_NO_CONTENT)
 
         elif call == "menu":
             menu = Menu.objects.all()
@@ -268,11 +296,11 @@ def app(request, call):
                 elif (request.data.get("machine") == "2"):
                     rollNumber = request.data.get("rollNumber")
                     try:
-                        student = Student.objects.filter(rollNumber=rollNumber)
+                        student = Student.objects.get(rollNumber=rollNumber)
                         try:
                             meal = Meal.objects.get(
                                 student=student, type=get_meal_type(), date=datetime.now().date())
-                            if (meal.weight == None):
+                            if (meal.weight is None):
                                 ROLL_WAITING[2] = rollNumber
                                 return Response(status=status.HTTP_202_ACCEPTED)
                             else:
