@@ -26,7 +26,7 @@ const char* ssid = "Samsung M31";
 const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.100.81:8000/mess/login/";
+String serverName = "http://192.168.54.81:8000/mess/login/";
 
 
 
@@ -109,7 +109,7 @@ void loop(){
     http.begin(serverpath.c_str());
     httpResponseCode = http.GET();
     if (httpResponseCode = 202) {
-      Serial.print("PinCode Accepted");
+      Serial.println("PinCode Accepted");
       LCDprint("Pincode Accepted", 1);   
     }
     else{
@@ -124,13 +124,14 @@ void loop(){
         Serial.println("Valid Card Found");   
         LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
         LCDprint("Valid Card Found", 1);       
-        extent = "?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+        extent = "recognise?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
       }
       else{
-        extent= "";
+        extent= "recognise";
       }
-      
+      delay(500);
       serverpath = serverName + extent;
+      Serial.println(serverpath);      
       http.begin(serverpath.c_str());
       switch (httpResponseCode = http.GET()){
         case 204:
@@ -140,13 +141,15 @@ void loop(){
         case 404:
         {
           LCDprint("Not Registered", 0);
+          delay(1000);
           break;          
         }
         case 403:
         {
           String payload = http.getString();
           LCDprint("Sorry, " + payload, 0);
-          LCDprint("Meal Forbidden", 1);   
+          LCDprint("Meal Forbidden", 1);
+          delay(1000);   
           break;       
         }
         case 208:
@@ -154,13 +157,15 @@ void loop(){
           String payload = http.getString();
           LCDprint("Hii, " + payload, 0); 
           LCDprint("Already Taken", 0);
+          delay(1000);
           break;          
         } 
         case 201:
         {
-          String payload =  http.getString();
-          LCDprint("Hii, " + payload, 0);
-          LCDprint("Take Your Plate", 1);                    
+          String payload = "Hii, " +  http.getString();
+          LCDprint(payload, 0);
+          LCDprint("Take Your Plate", 1); 
+          delay(1000);                   
           break;       
         }
         default:

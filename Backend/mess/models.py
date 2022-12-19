@@ -61,7 +61,11 @@ class Meal(models.Model):
         ordering = ["-date", "student__rollNumber"]
 
     def __str__(self):
-        return self.student.rollNumber + "/" + str(self.date) + "/" + self.type + "/" + self.weight
+        if self.weight != None:
+            return self.student.rollNumber + "/" + str(self.date) + "/" + self.type + "/" + self.weight
+        else:
+            return self.student.rollNumber + "/" + str(self.date) + "/" + self.type + "/"
+
 
 
 

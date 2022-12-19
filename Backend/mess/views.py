@@ -34,23 +34,55 @@ ROLL_WAITING = [None, None, None]
 @api_view(['POST'])
 def sso_login(request):
     access_code = request.data.get("access_code")
-    token_exchange_response = requests.post(url=settings.TOKEN_EXCHANGE_URL, 
+    print("ACCESS CODE", access_code)
+    token_exchange_response = requests.post(url=settings.TOKEN_EXCHANGE_URL,
                                             headers={
-                                                    "Authorization": "Basic {}".format(base64.b64encode("{}:{}".format(settings.CLIENT_ID, settings.CLIENT_SECRET).encode('ascii')).decode('ascii')),
-                                                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                                                    }, 
-                                            data="code={}&redirect_uri={}&grant_type=authorization_code".format(access_code, settings.REDIRECT_URI)
-                                            )
+                                                "Authorization": "Basic {}".format(base64.b64encode("{}:{}".format(settings.CLIENT_ID, settings.CLIENT_SECRET).encode('ascii')).decode('ascii')),
+                                                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                                            },
+                                            data="code={}&redirect_uri={}&grant_type=authorization_code".format(access_code, settings.REDIRECT_URI),)
     token_exchanage = token_exchange_response.json()
+    print("TOKEN EXCHANGE RESPONSE", token_exchanage)
     access_token = token_exchanage.get("access_token")
-    resources_response = requests.get(url=settings.RESOURCES_URL, headers={"Authorization": "Bearer {}".format(access_token)})
+    resources_response = requests.get(url=settings.RESOURCES_URL, headers={
+        "Authorization": "Bearer {}".format(access_token),
+    },)
     resources = resources_response.json()
+    print(resources)
     roll_number = resources.get("roll_number")
-    name = "{} {}".format(resources.get("first_name"), resources.get("last_name"))
+    name = "{} {}".format(resources.get("first_name"),
+                          resources.get("last_name"))
     student, _ = Student.objects.get_or_create(
         name=name, rollNumber=roll_number)
-    result = StudentSerializer(student)
+    result = StudentSerializer(student, context={"request": request})
     return Response(result.data)
+
+
+@api_view(['POST'])
+def update(request):
+    rollNumber = request.data.get("rollNumber")
+    roomNumber = request.data.get("roomNumber")
+    print(rollNumber, roomNumber)
+    student = Student.objects.get(rollNumber=rollNumber)
+    student.roomNumber = roomNumber
+    if len(dict(request.FILES)) > 0 and "file" in dict(request.FILES).keys():
+        print("CONTAINS IMAGE")
+        student.photo = request.FILES["file"]
+    student.save()
+    return Response({
+        "messge": "Updated successfully",
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_student(request):
+    roll_number = request.headers.get("rollNumber")
+    if Student.objects.filter(rollNumber=roll_number).exists():
+        student = Student.objects.get(rollNumber=roll_number)
+        result = StudentSerializer(student, context={"request": request})
+        return Response(result.data)
+    else:
+        return Response({"message": "No student with the matching roll number"})
 
 
 @api_view(['GET', 'PATCH'])
@@ -86,13 +118,13 @@ def login(request, rfid_pin):
                 try:
                     student = Student.objects.get(RFID=RFID)
                     if (student.permission == 'NA'):
-                        return Response(student.name, status=status.HTTP_403_FORBIDDEN)
+                        return Response(student.alias, status=status.HTTP_403_FORBIDDEN)
                     elif (Meal.objects.filter(student=student, type=MEAL_TYPE, date=datetime.now().date()).exists()):
-                        return Response(student.name, status=status.HTTP_208_ALREADY_REPORTED)
+                        return Response(student.alias, status=status.HTTP_208_ALREADY_REPORTED)
                     else:
                         meal = Meal(student=student, type=MEAL_TYPE, weight=None, date=datetime.now().date())
                         meal.save()
-                        return Response(student.name, status=status.HTTP_201_CREATED)
+                        return Response(student.alias, status=status.HTTP_201_CREATED)
                 except Student.DoesNotExist:
                     return Response(status=status.HTTP_404_NOT_FOUND)
             elif (ROLL_WAITING[1] != None):
@@ -101,10 +133,6 @@ def login(request, rfid_pin):
                 return Response(name, status=status.HTTP_201_CREATED)
             else:
                 return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-
-
 
 
 @api_view(['GET'])
@@ -121,20 +149,22 @@ def weight(request, rfid_pin):
                 RFID = None
             if RFID != None:
                 try:
-                    student = Student.objects.filter(RFID=RFID)
+                    student = Student.objects.get(RFID=RFID)
                     try:
+                        print(RFID)
+                        print(MEAL_TYPE) 
                         meal = Meal.objects.get(student__RFID=RFID, type=MEAL_TYPE, date=datetime.now().date())
-                        if (meal.weight == None):
+                        if (meal.weight is None):
                             ROLL_WAITING[2] = RFID
-                            return Response(student.name, status=status.HTTP_202_ACCEPTED)
+                            return Response(student.alias, status=status.HTTP_202_ACCEPTED)
                         else:
-                            return Response(student.name, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+                            return Response(student.alias, status=status.HTTP_405_METHOD_NOT_ALLOWED)
                     except Meal.DoesNotExist:
-                        return Response(student.name, status=status.HTTP_206_PARTIAL_CONTENT)                    
+                        return Response(student.alias, status=status.HTTP_206_PARTIAL_CONTENT)                    
                 except Student.DoesNotExist:
                     return Response(status=status.HTTP_404_NOT_FOUND)
-            elif ROLL_WAITING[2] != None:
-                return Response(Student.objects.filter(RFID=RFID).name, status=status.HTTP_202_ACCEPTED)  
+            elif (ROLL_WAITING[2] != None):
+                return Response(Student.objects.filter(RFID=RFID).alias, status=status.HTTP_202_ACCEPTED)  
             else:
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -167,14 +197,14 @@ def app(request, call):
                     try:
                         student = Student.objects.get(RFID=request.data.get("rfid"))
                         if (student.permission == 'NA'):
-                            return Response(student.name, status=status.HTTP_403_FORBIDDEN)
+                            return Response(student.alias, status=status.HTTP_403_FORBIDDEN)
                         elif (Meal.objects.filter(student=student, type=MEAL_TYPE, date=datetime.now().date()).exists()):
-                            return Response(student.name, status=status.HTTP_208_ALREADY_REPORTED)
+                            return Response(student.alias, status=status.HTTP_208_ALREADY_REPORTED)
                         else:
                             meal = Meal(student=student, type=MEAL_TYPE, weight=None, date=datetime.now().date())
                             meal.save()
                             ROLL_WAITING[int(request.data.get("machine"))] = request.data.get("rfid")
-                            return Response(student.name, status=status.HTTP_201_CREATED)
+                            return Response(student.alias, status=status.HTTP_201_CREATED)
                     except Student.DoesNotExist: 
                         return Response(status=status.HTTP_404_NOT_FOUND)
                 elif (request.data.get("machine")=="2"):
@@ -187,9 +217,9 @@ def app(request, call):
                                 ROLL_WAITING[2] = RFID
                                 return Response(status=status.HTTP_202_ACCEPTED)
                             else:
-                                return Response(student.name, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+                                return Response(student.alias, status=status.HTTP_405_METHOD_NOT_ALLOWED)
                         except Meal.DoesNotExist:
-                            return Response(student.name, status=status.HTTP_206_PARTIAL_CONTENT)                    
+                            return Response(student.alias, status=status.HTTP_206_PARTIAL_CONTENT)                    
                     except Student.DoesNotExist:
                         return Response(status=status.HTTP_404_NOT_FOUND)
             else:

@@ -26,13 +26,15 @@ const char* ssid = "Samsung M31";
 const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.100.81:8000/mess/weight/";
+String serverName = "http://192.168.57.81:8000/mess/weight/";
 
 
 
 //RFID decalarations
 #define SS_PIN 5
 #define RST_PIN 27
+
+
 #define WEIGHT_THR 30
  
 MFRC522 rfid(SS_PIN, RST_PIN); // Instance of the class
@@ -42,8 +44,8 @@ byte nuidPICC[4];
 
 
 //HX711 declaration
-#define DOUT 16
-#define CLK 25
+#define DOUT 32
+#define CLK 33
 
 HX711 scale(DOUT, CLK);
 
@@ -56,26 +58,29 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 //Variable declarations
 int Pincode;
 int httpResponseCode;
-long calibrationFactor;
-float knownWeight = 100;
+float calibrationFactor;
+float knownWeight = 500;
 String extent;
 
 void setup() {
   Serial.begin(115200);
-  
-  //setup for HX711
-  //pinMode(reset, INPUT_PULLUP);
+
+   //HX711 setup
+  Serial.println("Remove any weight");
+  delay(3000); 
   scale.set_scale();
   scale.tare();
+  scale.read_average();  
   Serial.println("Place a known weight");
-  delay(5000);
-  
-  long reading = scale.get_units(10);
+  delay(3000);
+  long reading = scale.get_units(20);
+  Serial.println("Remove the weight");
+  delay(3000);
   calibrationFactor = reading/knownWeight;
-
   scale.set_scale(calibrationFactor);
   scale.tare();
-  
+ 
+  Serial.println(scale.get_units(10), 1); 
   
   // setup for RC522
   SPI.begin();      // Init SPI bus
@@ -109,17 +114,36 @@ void setup() {
 
   //random seed
   randomSeed(analogRead(0));
+
+ 
+  
 }
 
 
 void loop(){
-  
+ /* 
+  while (true){
+    Serial.println("Starting");    
+    delay(3000);
+    Serial.println(scale.get_units(), 1);
+    long int weight = weighing("chief");
+    delay(2000);
+    Serial.println(weight);        
+   }*/
+
+
   Pincode = random(1000, 10000);                                        //generate a 4-digit pin
   Serial.println(Pincode);                            
   lcd.clear();
   LCDprint(String(Pincode), 1);
-
   
+
+  Serial.println("Check your weight"); 
+  delay(5000); 
+  Serial.println(scale.get_units(5), 1);
+  int weight = weighing("Chief");
+  Serial.println(weight);  
+       
   if (WiFi.status()==WL_CONNECTED){
     HTTPClient http;
     String serverpath = serverName + "pin?code=" +String(Pincode);
@@ -127,7 +151,7 @@ void loop(){
     http.begin(serverpath.c_str());
     httpResponseCode = http.GET();
     if (httpResponseCode = 202) {
-      Serial.print("PinCode Accepted");
+      Serial.println("PinCode Accepted");
       LCDprint("Pincode Accepted", 1);   
     }
     else{
@@ -136,16 +160,16 @@ void loop(){
     }
     
     while(true){
-      LCDprint("Tap ID/Use pin", 1); 
+      //LCDprint("Tap ID/Use pin", 1); 
 
       if (valid_card()){
         Serial.println("Valid Card Found");   
         LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
         LCDprint("Valid Card Found", 1);       
-        extent = "?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+        extent = "recognise?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
       }
       else{
-        extent= "";
+        extent= "recognise";
       }
 
       serverpath = serverName + extent;
@@ -179,8 +203,9 @@ void loop(){
           String payload =http.getString();
           int weight = weighing(payload);   
           if (weight == -1){
-              LCDprint("Weighing failed", 0);
+              LCDprint("No weight", 0);
               LCDprint("Try again!", 1);
+              delay(2000);              
               serverpath = serverName + "update";
           }
           else{    
@@ -191,19 +216,19 @@ void loop(){
             case 204:
             {
               LCDprint("No Content", 1);  
-              delay(500);            
+              delay(1000);            
               break;
             }
             case 205:
             {
               LCDprint("try again", 1);
-              delay(500);
+              delay(1000);
               break;
             }
             case 423:
             {
               LCDprint("Weight updated", 1); 
-              delay(500);             
+              delay(1000);             
               break;
             }
             default:
@@ -279,37 +304,49 @@ String Hex_to_String(byte *buffer, byte bufferSize){
 
 
 
-float weighing(String name){
-  LCDprint("Hii! " + name, 0);
+int weighing(String name){
+  name = "Hii! " + name; 
+  LCDprint(name, 0);
   LCDprint("weigh your plate", 1);
-  delay(1000);
+  delay(3000);
   for (int i=0; i<5; i++){
-    if (scale.get_units(5) < WEIGHT_THR){
+    
+    long int reading = scale.get_units(20);
+    scale.power_down();
+    delay(1000);
+    scale.power_up();
+    Serial.println(reading, 1);
+    if (reading < WEIGHT_THR){     
       LCDprint("waiting!", 1);
       delay(500);
       LCDprint("  ", 1);
       continue;
     }
-    float reading = scale.get_units(2);
-    LCDprint("weight: " + String(reading) + "gms", 1); 
+    LCDprint("weight: " + String(reading) + " gms", 1); 
+    delay(1000);
+    lcd.clear();
     return reading;
   }
-  return 0;
+  lcd.clear();
+  return -1;
 }
 
 
 
 void LCDprint(String msg, int line){  
     int len = msg.length();
+    Serial.println(len);        
     lcd.setCursor(0, line);  
     if (len > 16){
-      lcd.print("  Length Error  ");
+      lcd.print("   Length Error   ");
     }
     else{
       if (len % 2 == 0){
+        Serial.println(multiply(" ", (16-len)/2) + msg + multiply(" ", (16-len)/2));
         lcd.print(multiply(" ", (16-len)/2) + msg + multiply(" ", (16-len)/2));  
       }
       else{
+        Serial.println(multiply(" ", (16-len-1)/2) + msg + multiply(" ", (16-len+1)/2));
         lcd.print(multiply(" ", (16-len-1)/2) + msg + multiply(" ", (16-len+1)/2));  
       } 
     }
@@ -317,8 +354,9 @@ void LCDprint(String msg, int line){
 
 
 String multiply(String msg, int multiple){
+  String str = "";
   for (int i =0; i<multiple; i++){
-    msg = msg + msg;
+    str = str + msg;
   }
-  return msg;
+  return str;
 }
