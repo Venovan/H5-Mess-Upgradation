@@ -26,7 +26,7 @@ const char* ssid = "Samsung M31";
 const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.54.81:8000/mess/login/";
+String serverName = "http://192.168.246.81:8000/mess/login/";
 
 
 

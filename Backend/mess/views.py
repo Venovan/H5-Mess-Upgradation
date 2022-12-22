@@ -193,9 +193,8 @@ def app(request, call):
         if call == "validate":
             if PIN_CODES[int(request.data.get("machine"))] == request.data.get("code"):
                 if (request.data.get("machine")=="1"):
-                    print("reached")
                     try:
-                        student = Student.objects.get(RFID=request.data.get("rfid"))
+                        student = Student.objects.get(rollNumber=request.data.get("roll"))
                         if (student.permission == 'NA'):
                             return Response(student.alias, status=status.HTTP_403_FORBIDDEN)
                         elif (Meal.objects.filter(student=student, type=MEAL_TYPE, date=datetime.now().date()).exists()):
@@ -203,7 +202,7 @@ def app(request, call):
                         else:
                             meal = Meal(student=student, type=MEAL_TYPE, weight=None, date=datetime.now().date())
                             meal.save()
-                            ROLL_WAITING[int(request.data.get("machine"))] = request.data.get("rfid")
+                            ROLL_WAITING[int(request.data.get("machine"))] = student.alias
                             return Response(student.alias, status=status.HTTP_201_CREATED)
                     except Student.DoesNotExist: 
                         return Response(status=status.HTTP_404_NOT_FOUND)

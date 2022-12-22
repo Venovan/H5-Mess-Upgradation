@@ -25,7 +25,7 @@ const char* ssid = "Samsung M31";
 const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://127.0.0.1:8000/mess/weight/";
+String serverName = "http://192.168.17.81:8000/mess/register/";
 
 
 //RFID decalarations
@@ -42,18 +42,21 @@ const int rs = 4, en = 13, d4 = 14, d5 = 21, d6 = 15, d7 = 22;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 //Variable declarations
-int Pincode;
+int PinCode;
 int Exit = 0;
-int EnterPin = 25;
-int CancelPin = 26;
+int EnterPin = 32;
+int CancelPin = 33;
 int httpResponseCode;
+int Buzzer = 25;
 int data = 0, Enter = 0, Cancel = 0;
 
 void setup() {
   Serial.begin(115200);
- 
+  
+  pinMode(Buzzer, OUTPUT);
   pinMode(EnterPin, INPUT);
-  pinMode(CancelPin, INPUT);  
+  pinMode(CancelPin, INPUT); 
+
   // setup for RC522
   SPI.begin();      // Init SPI bus
   rfid.PCD_Init();  // Init MFRC522 
@@ -85,37 +88,29 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   randomSeed(analogRead(0));
+  valid_card_beep();  
 }
 
 
 void loop(){
-  /*
-  if (valid_card()){
-    Serial.println(Hex_to_String(rfid.uid.uidByte, rfid.uid.size));
-    lcd.setCursor(0, 1);
-    lcd.print(Hex_to_String(rfid.uid.uidByte, rfid.uid.size));
-  }
-  delay(1000);
-  Serial.println("OK");*/
-  Pincode = random(1000, 10000);  
-  Serial.println(Pincode);
+
+  PinCode = random(1000, 10000);  
+  Serial.println(PinCode);
   lcd.clear();
-  lcd.setCursor(5, 0);
-  lcd.print(Pincode);
+  LCDprint(String(PinCode), 0);
   data = 0;
   Enter = 0;
   Cancel = 0;
   
   if (WiFi.status()==WL_CONNECTED){
     HTTPClient http;
-    String serverpath = serverName + String(Pincode);
+    String serverpath = serverName + String(PinCode);
     Serial.println(serverpath);
     http.begin(serverpath.c_str());
     httpResponseCode = http.GET();
     if (httpResponseCode = 202) {
       Serial.print("PinCode Accepted");
-      lcd.setCursor(0, 1);
-      lcd.print("  Pin Accepted ");     
+      LCDprint("Pin Accepted", 1);    
       }
     else{
       Serial.print("Rejected with Error code:");
@@ -123,17 +118,15 @@ void loop(){
     }
     
     while(data == 0){
-      lcd.setCursor(0, 1);
-      lcd.print("Tap ID / use pin"); 
+      LCDprint("Tap ID/Use pin", 1);
+      
       if (valid_card()){
         Serial.println("Valid Card detected");
-        lcd.setCursor(0, 0);    
-        lcd.print("    " + Hex_to_String(rfid.uid.uidByte, rfid.uid.size));
-        lcd.setCursor(0, 1);
-        lcd.print("  Card Detected  ");
+        LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
+        LCDprint("Valid Card Found", 1);  
+        valid_card_beep();      
         delay(1000);
-        lcd.setCursor(0, 1);
-        lcd.print("  Push to send");
+        LCDprint("Push to send", 1);
         Serial.print("waiting for user to push any button");
         delay(500);
         while(Enter == 0 && Cancel == 0){
@@ -144,20 +137,21 @@ void loop(){
           delay(10);                                               
         }
         if (Enter == 1){
-          lcd.setCursor(0, 1);
-          lcd.print("  sending...");
+          LCDprint("sending...", 1);
           delay(100);
           Serial.println(Hex_to_String(rfid.uid.uidByte, rfid.uid.size).length());
           serverpath = serverName + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
           http.begin(serverpath.c_str());
           httpResponseCode = http.GET();
           if (httpResponseCode = 423) {
-            lcd.setCursor(0, 1);
-            lcd.print("  Mapping Done  ");
+            LCDprint("Mapping Done", 1);
+            mapping_done_beep();
+            delay(1000);      
           }
           else{
-            lcd.setCursor(0, 1);
-            lcd.print("Error");
+            LCDprint("Error", 1);
+            error_beep();
+            delay(1000);            
           }                
         }
         data = 1;
@@ -204,6 +198,34 @@ bool valid_card(){
     return false;
     }
 
+
+void valid_card_beep(){
+  digitalWrite(Buzzer, HIGH);
+  delay(500);
+  digitalWrite(Buzzer, LOW);
+  delay(300);
+  digitalWrite(Buzzer, HIGH);
+  delay(100);
+  digitalWrite(Buzzer, LOW);
+}
+
+void mapping_done_beep(){
+  digitalWrite(Buzzer, HIGH);
+  delay(600);
+  digitalWrite(Buzzer, LOW);
+}
+
+void error_beep(){
+  for (int i=0; i<3; i++){
+    digitalWrite(Buzzer, HIGH);
+    delay(200);
+    digitalWrite(Buzzer, LOW);
+    delay(200);    
+  }
+}
+
+
+
 String Hex_to_String(byte *buffer, byte bufferSize){
     String ID = "";
     String Number = "";
@@ -218,4 +240,34 @@ String Hex_to_String(byte *buffer, byte bufferSize){
       ID = ID + Number;
     }      
     return ID;
+}
+
+
+
+void LCDprint(String msg, int line){  
+    int len = msg.length();
+    Serial.println(len);        
+    lcd.setCursor(0, line);  
+    if (len > 16){
+      lcd.print("   Length Error   ");
+    }
+    else{
+      if (len % 2 == 0){
+        Serial.println(multiply(" ", (16-len)/2) + msg + multiply(" ", (16-len)/2));
+        lcd.print(multiply(" ", (16-len)/2) + msg + multiply(" ", (16-len)/2));  
+      }
+      else{
+        Serial.println(multiply(" ", (16-len-1)/2) + msg + multiply(" ", (16-len+1)/2));
+        lcd.print(multiply(" ", (16-len-1)/2) + msg + multiply(" ", (16-len+1)/2));  
+      } 
+    }
+    }
+
+
+String multiply(String msg, int multiple){
+  String str = "";
+  for (int i =0; i<multiple; i++){
+    str = str + msg;
+  }
+  return str;
 }
