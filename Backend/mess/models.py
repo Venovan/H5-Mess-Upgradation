@@ -40,17 +40,16 @@ class Student(models.Model):
     name = models.CharField(max_length=50)
     alias = models.CharField(max_length=10, blank=True)
     permission = models.CharField(max_length=10, choices=STATUS, default='NA')
-    rollNumber = models.CharField(
-        max_length=12, validators=[ID_valid], unique=True)
+    rollNumber = models.CharField(max_length=12, validators=[ID_valid], unique=True)
     roomNumber = models.CharField(max_length=6)
     RFID = models.CharField(max_length=15, blank=True, unique=False, null=True)
     photo = models.ImageField(upload_to=image_handler, default='avatar.jpg')
 
     class Meta:
-        ordering = ["rollNumber"]
+        ordering = ["rollNumber", "name"]
 
     def __str__(self):
-        return self.name
+        return self.rollNumber + "-" + self.name
 
 
 class Meal(models.Model):

@@ -25,7 +25,7 @@ const char* ssid = "Samsung M31";
 const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.17.81:8000/mess/register/";
+String serverName = "http://192.168.152.81:8000/mess/register/";
 
 
 //RFID decalarations
@@ -71,7 +71,7 @@ void setup() {
 
   //LCD setup for 16x2 display module
   lcd.begin(16, 2);
-  lcd.print("Hello World");
+  LCDprint("Hello World", 0);
 
   //WiFi setup
   WiFi.begin(ssid, password);
@@ -147,6 +147,11 @@ void loop(){
             LCDprint("Mapping Done", 1);
             mapping_done_beep();
             delay(1000);      
+          }
+          else if (httpResponseCode == 304){
+            LCDprint("Not Modified", 1);
+            error_beep();
+            delay(1000);
           }
           else{
             LCDprint("Error", 1);

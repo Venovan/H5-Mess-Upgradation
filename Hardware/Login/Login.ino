@@ -26,7 +26,7 @@ const char* ssid = "Samsung M31";
 const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.17.81:8000/mess/login/";
+String serverName = "http://192.168.152.81:8000/mess/login/";
 
 
 
@@ -74,7 +74,7 @@ void setup() {
 
   //LCD setup for 16x2 display module
   lcd.begin(16, 2);
-  lcd.print("Hello world");
+  LCDprint("Hello world", 0);
 
   //WiFi setup
   WiFi.begin(ssid, password);
@@ -144,6 +144,7 @@ void loop(){
         case 404:
         {
           LCDprint("Not Registered", 0);
+          error_beep();
           delay(1000);
           break;          
         }
@@ -152,6 +153,7 @@ void loop(){
           String payload = http.getString();
           LCDprint("Sorry, " + payload, 0);
           LCDprint("Meal Forbidden", 1);
+          error_beep();          
           delay(1000);   
           break;       
         }
