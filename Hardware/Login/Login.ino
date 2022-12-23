@@ -26,7 +26,7 @@ const char* ssid = "Samsung M31";
 const char* password = "12345678d";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.246.81:8000/mess/login/";
+String serverName = "http://192.168.17.81:8000/mess/login/";
 
 
 
@@ -48,6 +48,7 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 //Variable declarations
 int Pincode;
 int httpResponseCode;
+int Buzzer = 25;
 String extent;
 
 void setup() {
@@ -57,7 +58,7 @@ void setup() {
   //pinMode(reset, INPUT_PULLUP);
   //scale.set_scale();
   //scale.tare();
-  
+  pinMode(Buzzer, OUTPUT);
   
   // setup for RC522
   SPI.begin();      // Init SPI bus
@@ -91,6 +92,7 @@ void setup() {
 
   //random seed
   randomSeed(analogRead(0));
+  valid_card_beep();
 }
 
 
@@ -123,7 +125,8 @@ void loop(){
       if (valid_card()){
         Serial.println("Valid Card Found");   
         LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
-        LCDprint("Valid Card Found", 1);       
+        LCDprint("Valid Card Found", 1);   
+        valid_card_beep();
         extent = "recognise?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
       }
       else{
@@ -157,6 +160,7 @@ void loop(){
           String payload = http.getString();
           LCDprint("Hii, " + payload, 0); 
           LCDprint("Already Taken", 0);
+          error_beep();          
           delay(1000);
           break;          
         } 
@@ -165,6 +169,7 @@ void loop(){
           String payload = "Hii, " +  http.getString();
           LCDprint(payload, 0);
           LCDprint("Take Your Plate", 1); 
+          mapping_done_beep();          
           delay(1000);                   
           break;       
         }
@@ -213,6 +218,33 @@ bool valid_card(){
 
     return false;
     }
+
+
+
+void valid_card_beep(){
+  digitalWrite(Buzzer, HIGH);
+  delay(500);
+  digitalWrite(Buzzer, LOW);
+  delay(300);
+  digitalWrite(Buzzer, HIGH);
+  delay(100);
+  digitalWrite(Buzzer, LOW);
+}
+
+void mapping_done_beep(){
+  digitalWrite(Buzzer, HIGH);
+  delay(600);
+  digitalWrite(Buzzer, LOW);
+}
+
+void error_beep(){
+  for (int i=0; i<3; i++){
+    digitalWrite(Buzzer, HIGH);
+    delay(200);
+    digitalWrite(Buzzer, LOW);
+    delay(200);    
+  }
+}
 
 
 

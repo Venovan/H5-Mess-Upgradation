@@ -104,21 +104,21 @@ void loop(){
   
   if (WiFi.status()==WL_CONNECTED){
     HTTPClient http;
-    String serverpath = serverName + String(PinCode);
+    String serverpath = serverName + "pin?code=" + String(PinCode);
     Serial.println(serverpath);
     http.begin(serverpath.c_str());
     httpResponseCode = http.GET();
     if (httpResponseCode = 202) {
-      Serial.print("PinCode Accepted");
-      LCDprint("Pin Accepted", 1);    
-      }
+      Serial.println("PinCode Accepted");
+      LCDprint("Pincode Accepted", 1);   
+    }
     else{
       Serial.print("Rejected with Error code:");
       Serial.println(httpResponseCode);
     }
     
     while(data == 0){
-      LCDprint("Tap ID/Use pin", 1);
+
       
       if (valid_card()){
         Serial.println("Valid Card detected");
@@ -140,7 +140,7 @@ void loop(){
           LCDprint("sending...", 1);
           delay(100);
           Serial.println(Hex_to_String(rfid.uid.uidByte, rfid.uid.size).length());
-          serverpath = serverName + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+          serverpath = serverName + "card?rfid=" +  Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
           http.begin(serverpath.c_str());
           httpResponseCode = http.GET();
           if (httpResponseCode = 423) {

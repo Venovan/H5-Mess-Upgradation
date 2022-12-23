@@ -192,7 +192,11 @@ def app(request, call):
     if request.method == 'GET':
         if call == "validate":
             if PIN_CODES[int(request.data.get("machine"))] == request.data.get("code"):
-                if (request.data.get("machine")=="1"):
+                if (request.data.get("machine") == "0"):
+                    ROLL = request.data.get("roll")
+                    ROLL_WAITING[0] = ROLL
+                    return Response(status=status.HTTP_202_CREATED)
+                elif (request.data.get("machine")=="1"):
                     try:
                         student = Student.objects.get(rollNumber=request.data.get("roll"))
                         if (student.permission == 'NA'):
