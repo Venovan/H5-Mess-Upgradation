@@ -29,7 +29,7 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 DATE_INPUT_FORMATS = ['%d-%m-%Y']
 CSRF_TRUSTED_ORIGINS = [
-    "https://6af0-2409-4081-9d8a-99b8-801-72dd-c2ec-1f8d.in.ngrok.io", "http://127.0.0.1:8000/admin/"]
+    "https://6af0-2409-4081-9d8a-99b8-801-72dd-c2ec-1f8d.in.ngrok.io", "http://127.0.0.1:8000/admin/", "https://05b1-117-212-15-22.in.ngrok.io/"]
 
 
 # Application definition

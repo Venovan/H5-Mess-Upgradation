@@ -67,9 +67,11 @@ def sso_login(request):
 def update(request):
     rollNumber = request.data.get("rollNumber")
     roomNumber = request.data.get("roomNumber")
-    print(rollNumber, roomNumber)
+    alias = request.data.get("alias")
+    print(rollNumber, roomNumber, alias)
     student = Student.objects.get(rollNumber=rollNumber)
     student.roomNumber = roomNumber
+    student.alias = alias
     if len(dict(request.FILES)) > 0 and "file" in dict(request.FILES).keys():
         print("CONTAINS IMAGE")
         student.photo = request.FILES["file"]
@@ -162,7 +164,8 @@ def weight(request, rfid_pin):
                 try:
                     student = Student.objects.get(RFID=RFID)
                     try:
-                        meal = Meal.objects.get(student__RFID=RFID, type=get_meal_type(), date=datetime.now().date())
+                        meal = Meal.objects.get(
+                            student__RFID=RFID, type=get_meal_type(), date=datetime.now().date())
                         if (meal.weight == None):
                             ROLL_WAITING[2] = RFID
                             return Response(student.alias, status=status.HTTP_202_ACCEPTED)
@@ -263,7 +266,8 @@ def app(request, call):
         if call == "validate":
             print(request.data.get("machine"))
             print(request.data.get("code"))
-            print(PIN_CODES[int(request.data.get("machine"))] == request.data.get("code"))
+            print(PIN_CODES[int(request.data.get("machine"))]
+                  == request.data.get("code"))
             if PIN_CODES[int(request.data.get("machine"))] == request.data.get("code"):
                 if request.data.get("machine") == "0":
                     ROLL = request.data.get("rollNumber")
@@ -272,7 +276,8 @@ def app(request, call):
                 elif (request.data.get("machine") == "1"):
                     print("reached")
                     try:
-                        student = Student.objects.get(rollNumber=request.data.get("rollNumber"))
+                        student = Student.objects.get(
+                            rollNumber=request.data.get("rollNumber"))
                         if (student.permission == 'NA'):
                             return Response({
                                 "message": "Permission Denied"
@@ -282,10 +287,12 @@ def app(request, call):
                                 "message": "Meal Already Taken"
                             }, status=status.HTTP_208_ALREADY_REPORTED)
                         else:
-                            meal = Meal(student=student, type=get_meal_type(), weight=None, date=datetime.now().date())
+                            meal = Meal(student=student, type=get_meal_type(
+                            ), weight=None, date=datetime.now().date())
                             meal.save()
                             result = MealSerializer(meal)
-                            ROLL_WAITING[int(request.data.get("machine"))] = student.alias
+                            ROLL_WAITING[int(request.data.get(
+                                "machine"))] = student.alias
                             return Response({
                                 "message": result.data
                             }, status=status.HTTP_201_CREATED)
@@ -296,7 +303,8 @@ def app(request, call):
                     try:
                         student = Student.objects.get(rollNumber=rollNumber)
                         try:
-                            meal = Meal.objects.get(student=student, type=get_meal_type(), date=datetime.now().date())
+                            meal = Meal.objects.get(
+                                student=student, type=get_meal_type(), date=datetime.now().date())
                             if (meal.weight is None):
                                 ROLL_WAITING[2] = rollNumber
                                 return Response(status=status.HTTP_202_ACCEPTED)
