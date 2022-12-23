@@ -10,6 +10,6 @@ urlpatterns = [
     path("stats/<str:call>", views.arena),
     path("get_student/", views.get_student),
     path("update/", views.update),
-    path("sso_login/", views.sso_login)
+    path("sso_login/", views.sso_login),
+    path("status/", views.get_status),
 ]
-

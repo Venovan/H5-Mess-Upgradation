@@ -3,27 +3,35 @@ from rest_framework import serializers
 from datetime import datetime
 
 
-today = str(datetime.now().date())
-hours = datetime.now().hour
-
-
-MEAL_TYPE = ''
-
-if hours in range(7, 11):
-    MEAL_TYPE = 'B'
-elif hours in range(11, 16):
-    MEAL_TYPE = 'L'
-elif hours in range(16, 19):
-    MEAL_TYPE = 'S'
-elif hours in range(19, 23):
-    MEAL_TYPE = 'D'
-else:
-    MEAL_TYPE = None
+def get_meal_type():
+    hours = datetime.now().hour
+    print(hours)
+    if hours in range(6, 12):
+        return 'B'
+    elif hours in range(11, 17):
+        return 'L'
+    elif hours in range(16, 20):
+        return 'S'
+    elif hours in range(19, 24):
+        return 'D'
 
 
 class StudentSerializer(serializers.ModelSerializer):
+    photo = serializers.SerializerMethodField()
+
+    def get_photo(self, student):
+        request = self.context.get('request')
+        photo_url = student.photo.url
+        return request.build_absolute_uri(photo_url)
+
     class Meta:
         model = Student
+        fields = "__all__"
+
+
+class MealSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Meal
         fields = "__all__"
 
 
@@ -35,9 +43,9 @@ class LoginSerializer(serializers.ModelSerializer):
         fields = ["name", "status"]
 
     def get_status(self, student):
-
         try:
-            Meal.objects.get(student=student, date=today, type=MEAL_TYPE)
+            Meal.objects.get(
+                student=student, date=datetime.today(), type=get_meal_type())
             status = "Taken"
         except Meal.DoesNotExist:
             status = "Allowed"
