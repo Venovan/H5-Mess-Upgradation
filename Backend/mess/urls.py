@@ -12,4 +12,6 @@ urlpatterns = [
     path("update/", views.update),
     path("sso_login/", views.sso_login),
     path("status/", views.get_status),
+    path("test_student/", views.create_test_users),
+    path("test_meals/", views.create_test_meals),
 ]

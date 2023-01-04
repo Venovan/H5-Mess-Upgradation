@@ -5,10 +5,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta
 from django.db.models import Avg, Sum, Variance
+from django.db.models.fields.files import ImageFieldFile, FileField
 import H5Mess.settings as settings
 import requests
 import base64
 import json
+import random
 
 
 def get_meal_type():
@@ -75,6 +77,7 @@ def update(request):
     if len(dict(request.FILES)) > 0 and "file" in dict(request.FILES).keys():
         print("CONTAINS IMAGE")
         student.photo = request.FILES["file"]
+        student.permission = "A"
     student.save()
     return Response({
         "messge": "Updated successfully",
@@ -434,3 +437,40 @@ def top_N_scorers(N, start, end, type=None):
         del leaders[each]["student__rollNumber"]
 
     return leaders[:N]
+
+
+@api_view(['POST'])
+def create_test_users(request):
+    for i in range(1, 11):
+        name = "Person " + str(i)
+        alias = "Person" + str(i)
+        rollNumber = "20002000" + str(i)
+        roomNumber = str(i)
+        RFID = "1000000"+str(i)
+        photo = ImageFieldFile(
+            instance=None, field=FileField(), name='/photos/test.jpg')
+        student, _ = Student.objects.update_or_create(
+            name=name, alias=alias, roomNumber=roomNumber, rollNumber=rollNumber, photo=photo, permission="A", RFID=RFID)
+        student.save()
+    return Response({})
+
+
+@api_view(['POST'])
+def create_test_meals(request):
+    for i in range(1, 11):
+        rollNumber = "20002000" + str(i)
+        student = Student.objects.get(rollNumber=rollNumber)
+        for i in range(1, 11):
+            breakfast = Meal.objects.create(
+                student=student, type="B", date=datetime.today()+timedelta(days=(i-1)), weight=random.randint(10, 75))
+            breakfast.save()
+            lunch = Meal.objects.create(
+                student=student, type="L", date=datetime.today()+timedelta(days=(i-1)), weight=random.randint(40, 120))
+            lunch.save()
+            snack = Meal.objects.create(
+                student=student, type="S", date=datetime.today()+timedelta(days=(i-1)), weight=random.randint(5, 100))
+            snack.save()
+            dinner = Meal.objects.create(
+                student=student, type="D", date=datetime.today()+timedelta(days=(i-1)), weight=random.randint(10, 150))
+            dinner.save()
+    return Response({})
