@@ -22,12 +22,11 @@
 #include <Wifi.h>
 #include "HX711.h"
 
-const char* ssid = "Samsung M31";
-const char* password = "12345678d";
+const char* ssid = "H5Mess";
+const char* password = "hostel5mess";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.152.81:8000/mess/login/";
-
+String serverName = "http://192.168.0.101:8000/mess/login/";
 
 
 //RFID decalarations
@@ -49,11 +48,15 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 int Pincode;
 int httpResponseCode;
 int Buzzer = 25;
+int TIME_THR = 2000;
+unsigned long  CurrentTime, PreviousTime=0;
+unsigned long wifi_delay = 5000;
+
 String extent;
 
 void setup() {
   Serial.begin(115200);
-  
+  Serial.println("Yayyy!!");
   //setup for HX711
   //pinMode(reset, INPUT_PULLUP);
   //scale.set_scale();
@@ -74,12 +77,18 @@ void setup() {
 
   //LCD setup for 16x2 display module
   lcd.begin(16, 2);
-  LCDprint("Hello world", 0);
+  LCDprint("hello world", 0);
 
   //WiFi setup
   WiFi.begin(ssid, password);
  
   while (WiFi.status() != WL_CONNECTED) {
+    if (millis() >= wifi_delay){
+      LCDprint("Router not found", 0);
+      LCDprint("Restarting...", 1);
+      delay(500);
+      ESP.restart();  
+    }    
     delay(500);
     Serial.print(".");
   }
@@ -120,19 +129,28 @@ void loop(){
     }
     
     while(true){
+      LCDprint(String(Pincode), 0);       
       LCDprint("Tap ID/Use pin", 1); 
+      
+
+      if ((WiFi.status() != WL_CONNECTED) && (millis() >= wifi_delay)){
+          LCDprint("Router not found", 0);
+          LCDprint("Reconnecting...", 1);
+          delay(500);
+          ESP.restart();
+      }  
       
       if (valid_card()){
         Serial.println("Valid Card Found");   
-        LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
-        LCDprint("Valid Card Found", 1);   
+        //LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
+        LCDprint("Card Found", 1);   
         valid_card_beep();
         extent = "recognise?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
       }
       else{
         extent= "recognise";
       }
-      delay(500);
+      //delay(500);
       serverpath = serverName + extent;
       Serial.println(serverpath);      
       http.begin(serverpath.c_str());
@@ -162,7 +180,7 @@ void loop(){
           String payload = http.getString();
           LCDprint("Hii, " + payload, 0); 
           LCDprint("Already Taken", 0);
-          error_beep();          
+          two_long();          
           delay(1000);
           break;          
         } 
@@ -201,7 +219,7 @@ bool valid_card(){
         }
 
     //valid if new card is read than previous one
-    if (rfid.uid.uidByte[0] != nuidPICC[0] || 
+    /*if (rfid.uid.uidByte[0] != nuidPICC[0] || 
         rfid.uid.uidByte[1] != nuidPICC[1] || 
         rfid.uid.uidByte[2] != nuidPICC[2] || 
         rfid.uid.uidByte[3] != nuidPICC[3] ) {
@@ -211,7 +229,18 @@ bool valid_card(){
             rfid.PICC_HaltA();
             rfid.PCD_StopCrypto1();
             return true;
-        }
+        }*/
+    CurrentTime = millis();
+    if ((CurrentTime - PreviousTime) > TIME_THR) {
+      PreviousTime = CurrentTime;
+      for (byte i = 0; i < 4; i++){
+        nuidPICC[i] = rfid.uid.uidByte[i];
+      }
+      rfid.PICC_HaltA();
+      rfid.PCD_StopCrypto1();
+      return true;
+    }
+    
     // Halt PICC
     rfid.PICC_HaltA();
 
@@ -231,6 +260,15 @@ void valid_card_beep(){
   digitalWrite(Buzzer, HIGH);
   delay(100);
   digitalWrite(Buzzer, LOW);
+}
+
+void two_long(){
+  for (int i=0; i<2; i++){
+    digitalWrite(Buzzer, HIGH);
+    delay(100);
+    digitalWrite(Buzzer, LOW);
+    delay(100);    
+  }  
 }
 
 void mapping_done_beep(){

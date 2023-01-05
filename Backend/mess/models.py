@@ -38,8 +38,8 @@ def menu_handler(instance, filename):
 # Create your models here.
 class Student(models.Model):
     name = models.CharField(max_length=50)
-    alias = models.CharField(max_length=10, blank=True)
-    permission = models.CharField(max_length=10, choices=STATUS, default='NA')
+    alias = models.CharField(max_length=10, blank=True, default="User")
+    permission = models.CharField(max_length=10, choices=STATUS, default='A')
     rollNumber = models.CharField(max_length=12, validators=[ID_valid], unique=True)
     roomNumber = models.CharField(max_length=6)
     RFID = models.CharField(max_length=15, blank=True, unique=False, null=True)

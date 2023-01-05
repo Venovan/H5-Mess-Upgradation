@@ -22,11 +22,11 @@
 #include <Wifi.h>
 #include "HX711.h"
 
-const char* ssid = "Samsung M31";
-const char* password = "12345678d";
+const char* ssid = "H5Mess";
+const char* password = "hostel5mess";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.57.81:8000/mess/weight/";
+String serverName = "http://192.168.0.101:8000/mess/weight/";
 
 
 
@@ -44,8 +44,8 @@ byte nuidPICC[4];
 
 
 //HX711 declaration
-#define DOUT 32
-#define CLK 33
+#define DOUT 33
+#define CLK 32
 
 HX711 scale(DOUT, CLK);
 
@@ -58,29 +58,48 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 //Variable declarations
 int Pincode;
 int httpResponseCode;
+int Buzzer = 25;
+int TIME_THR = 2000;
+unsigned long CurrentTime, PreviousTime = 0;
+unsigned long wifi_delay = 5000;
 float calibrationFactor;
-float knownWeight = 500;
+float knownWeight = 210;
 String extent;
 
 void setup() {
   Serial.begin(115200);
+  pinMode(Buzzer, OUTPUT);
 
-   //HX711 setup
-  Serial.println("Remove any weight");
-  delay(3000); 
-  scale.set_scale();
-  scale.tare();
-  scale.read_average();  
-  Serial.println("Place a known weight");
-  delay(3000);
-  long reading = scale.get_units(20);
-  Serial.println("Remove the weight");
-  delay(3000);
-  calibrationFactor = reading/knownWeight;
-  scale.set_scale(calibrationFactor);
-  scale.tare();
+  //LCD setup for 16x2 display module
+  lcd.begin(16, 2);
+  LCDprint("hello World", 0);
+
+
+  //WiFi setup
+  WiFi.begin(ssid, password);
  
-  Serial.println(scale.get_units(10), 1); 
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() >= wifi_delay){
+      LCDprint("Router not found", 0);
+      LCDprint("Restarting...", 1);
+      delay(500);
+      ESP.restart();  
+    }
+    delay(500);
+    Serial.print(".");
+  }
+ 
+ 
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  valid_card_beep();
+
+  
+   //HX711 setup
+  Calibrate();
+  
   
   // setup for RC522
   SPI.begin();      // Init SPI bus
@@ -94,55 +113,23 @@ void setup() {
   Serial.print(F("Using the following key:"));
   Serial.println(Hex_to_String(key.keyByte, MFRC522::MF_KEY_SIZE));
 
-  //LCD setup for 16x2 display module
-  lcd.begin(16, 2);
-  lcd.print("Hello world");
-
-  //WiFi setup
-  WiFi.begin(ssid, password);
- 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
- 
- 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
 
   //random seed
   randomSeed(analogRead(0));
-
+  valid_card_beep();
  
   
 }
 
 
 void loop(){
- /* 
-  while (true){
-    Serial.println("Starting");    
-    delay(3000);
-    Serial.println(scale.get_units(), 1);
-    long int weight = weighing("chief");
-    delay(2000);
-    Serial.println(weight);        
-   }*/
 
 
   Pincode = random(1000, 10000);                                        //generate a 4-digit pin
   Serial.println(Pincode);                            
   lcd.clear();
-  LCDprint(String(Pincode), 1);
   
-
-  Serial.println("Check your weight"); 
-  delay(5000); 
-  Serial.println(scale.get_units(5), 1);
-  int weight = weighing("Chief");
-  Serial.println(weight);  
+  
        
   if (WiFi.status()==WL_CONNECTED){
     HTTPClient http;
@@ -152,7 +139,8 @@ void loop(){
     httpResponseCode = http.GET();
     if (httpResponseCode = 202) {
       Serial.println("PinCode Accepted");
-      LCDprint("Pincode Accepted", 1);   
+      LCDprint("Pincode Accepted", 1); 
+      delay(200);  
     }
     else{
       Serial.print("Rejected with Error code:");
@@ -160,12 +148,22 @@ void loop(){
     }
     
     while(true){
-      //LCDprint("Tap ID/Use pin", 1); 
+      LCDprint(String(Pincode), 0);
+      LCDprint("Tap ID/Use pin", 1); 
 
+      if ((WiFi.status() != WL_CONNECTED) && (millis() >= wifi_delay)){
+          LCDprint("Router not found", 0);
+          LCDprint("Reconnecting...", 1);
+          delay(500);
+          ESP.restart();
+      }  
+      
+          
       if (valid_card()){
         Serial.println("Valid Card Found");   
-        LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
-        LCDprint("Valid Card Found", 1);       
+        //LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
+        LCDprint("Card Found", 1);  
+        valid_card_beep();     
         extent = "recognise?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
       }
       else{
@@ -182,13 +180,18 @@ void loop(){
         case 404:
         {
           LCDprint("Not Registered", 0);
+          LCDprint("Register first", 1);
+          error_beep();
+          delay(1000);
           break;          
         }
         case 206:
         {
           String payload = http.getString();
-          LCDprint("Hello, " + payload, 0);
+          LCDprint("Hii, " + payload, 0);
           LCDprint("No Meal Taken", 1);
+          error_beep();
+          delay(1000);
           break;                                        
         }
         case 405:
@@ -196,16 +199,20 @@ void loop(){
           String payload = http.getString();
           LCDprint("Sorry, " + payload, 0);
           LCDprint("Already Weighed", 1);   
+          two_long();
+          delay(1000);
           break;       
         }
         case 202:
         {
           String payload =http.getString();
-          int weight = weighing(payload);   
+          int weight = weighing(payload);  
+          Serial.println(String(weight)); 
           if (weight == -1){
+              error_beep();
               LCDprint("No weight", 0);
               LCDprint("Try again!", 1);
-              delay(2000);              
+              delay(1000);              
               serverpath = serverName + "update";
           }
           else{    
@@ -222,13 +229,15 @@ void loop(){
             case 205:
             {
               LCDprint("try again", 1);
-              delay(1000);
+              delay(1500);
               break;
             }
             case 423:
             {
+              LCDprint("weight: " + String(weight) + "gms", 0);              
               LCDprint("Weight updated", 1); 
-              delay(1000);             
+              mapping_done_beep();
+              delay(1500);             
               break;
             }
             default:
@@ -264,7 +273,7 @@ bool valid_card(){
         }
 
     //valid if new card is read than previous one
-    if (rfid.uid.uidByte[0] != nuidPICC[0] || 
+    /*if (rfid.uid.uidByte[0] != nuidPICC[0] || 
         rfid.uid.uidByte[1] != nuidPICC[1] || 
         rfid.uid.uidByte[2] != nuidPICC[2] || 
         rfid.uid.uidByte[3] != nuidPICC[3] ) {
@@ -274,7 +283,19 @@ bool valid_card(){
             rfid.PICC_HaltA();
             rfid.PCD_StopCrypto1();
             return true;
-        }
+        }*/
+    CurrentTime = millis();
+    if ((CurrentTime - PreviousTime) > TIME_THR) {
+      PreviousTime = CurrentTime;
+      for (byte i = 0; i < 4; i++){
+        nuidPICC[i] = rfid.uid.uidByte[i];
+      }
+      rfid.PICC_HaltA();
+      rfid.PCD_StopCrypto1();
+      return true;
+    }
+    
+    
     // Halt PICC
     rfid.PICC_HaltA();
 
@@ -285,6 +306,80 @@ bool valid_card(){
     }
 
 
+void Calibrate(){
+  single_beep();   
+  LCDprint("Starting", 0);
+  LCDprint("Calibration", 1);
+  delay(500);
+  
+  single_beep();   
+  LCDprint("Remove All", 0); 
+  LCDprint("Weights", 1);
+  delay(2000); 
+  scale.set_scale();
+  scale.tare();
+  scale.read_average();  
+  
+  single_beep();   
+  LCDprint("Place a known", 0); 
+  LCDprint("Weight", 1);
+  delay(2000);
+  long reading = scale.get_units(20);
+  single_beep(); 
+  LCDprint("Remove the", 0); 
+  LCDprint("known weight", 1);
+  delay(2000);
+  calibrationFactor = reading/knownWeight;
+  scale.set_scale(calibrationFactor);
+  scale.tare();
+  mapping_done_beep();
+  lcd.clear();
+  Serial.println(String(calibrationFactor));
+  LCDprint("Calibration :", 0); 
+  LCDprint(String(calibrationFactor), 1);  
+  delay(1000);
+  lcd.clear();
+}
+
+void valid_card_beep(){
+  digitalWrite(Buzzer, HIGH);
+  delay(500);
+  digitalWrite(Buzzer, LOW);
+  delay(300);
+  digitalWrite(Buzzer, HIGH);
+  delay(100);
+  digitalWrite(Buzzer, LOW);
+}
+
+void two_long(){
+  for (int i=0; i<2; i++){
+    digitalWrite(Buzzer, HIGH);
+    delay(100);
+    digitalWrite(Buzzer, LOW);
+    delay(100);    
+  }  
+}
+
+void mapping_done_beep(){
+  digitalWrite(Buzzer, HIGH);
+  delay(600);
+  digitalWrite(Buzzer, LOW);
+}
+
+void error_beep(){
+  for (int i=0; i<3; i++){
+    digitalWrite(Buzzer, HIGH);
+    delay(200);
+    digitalWrite(Buzzer, LOW);
+    delay(200);    
+  }
+}
+
+void single_beep(){
+  digitalWrite(Buzzer, HIGH);
+  delay(300);
+  digitalWrite(Buzzer, LOW);
+}
 
 String Hex_to_String(byte *buffer, byte bufferSize){
     String ID = "";
@@ -308,22 +403,21 @@ int weighing(String name){
   name = "Hii! " + name; 
   LCDprint(name, 0);
   LCDprint("weigh your plate", 1);
-  delay(3000);
+  mapping_done_beep();  
+  delay(500);
   for (int i=0; i<5; i++){
     
-    long int reading = scale.get_units(20);
-    scale.power_down();
-    delay(1000);
-    scale.power_up();
-    Serial.println(reading, 1);
-    if (reading < WEIGHT_THR){     
+    long int reading1 = scale.get_units(20);
+    delay(100);
+    long int reading2 = scale.get_units(20);
+    long int reading = (reading1 + reading2)/2;
+    if (!((abs(reading1 - reading2) < WEIGHT_THR) && (reading1 > WEIGHT_THR) && (reading2 > WEIGHT_THR) && (reading < 10000))) {   //weight below 10000 and above WEIGHT_THR are valid
       LCDprint("waiting!", 1);
-      delay(500);
+      single_beep();
+      delay(10);                  
       LCDprint("  ", 1);
       continue;
-    }
-    LCDprint("weight: " + String(reading) + " gms", 1); 
-    delay(1000);
+    } 
     lcd.clear();
     return reading;
   }
