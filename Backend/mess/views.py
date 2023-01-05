@@ -370,7 +370,7 @@ def total_day_waste(start, end, type=None):
 
 def average_day_waste(start, end, type=None):
     if type == None:
-        return Meal.objects.filter(date_range=[start, end]).aggregate(Avg("weight"))
+        return Meal.objects.filter(date__range=[start, end]).aggregate(Avg("weight"))
     else:
         return Meal.objects.filter(date__range=[start, end], type=type).aggregate(Avg("weight"))
 
@@ -387,6 +387,32 @@ def moving_avg_waste(start, end, type=None):
         return Meal.objects.filter(date__range=[start, end]).aggregate(Avg("weight"))
     else:
         return Meal.objects.filter(date__range=[start, end], type=type).aggregate(Avg("weight"))
+
+
+@api_view(["GET"])
+def day_summary(request):
+    start = datetime.fromisoformat(request.headers.get("start"))
+    end = datetime.fromisoformat(request.headers.get("end"))
+    type = request.headers.get("type")
+    print(start, end, type)
+    average = average_day_waste(start, end)
+    variance = 0.0
+    total = total_day_waste(start, end)
+    data = []
+    date = start
+    while(date <= end):
+        day = Meal.objects.filter(date=date)
+        sum = 0
+        for meal in day:
+            sum += float(meal.weight)
+        print(sum)
+        data.append([date, sum])
+        date += timedelta(days=1)
+    return Response({
+        "total": total["weight__sum"],
+        "average": average["weight__avg"],
+        "data": data
+    },)
 
 
 # INDIVIDUAL STATISTICS API CALLS
