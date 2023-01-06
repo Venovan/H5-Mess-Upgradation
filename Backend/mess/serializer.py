@@ -35,6 +35,12 @@ class MealSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class DayMealSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Meal
+        fields = ("type", "weight")
+
+
 class LoginSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
 

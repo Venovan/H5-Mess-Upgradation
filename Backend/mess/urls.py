@@ -3,6 +3,7 @@ from mess import views
 
 
 urlpatterns = [
+    path("verify/", views.verify_network),
     path("login/<str:rfid_pin>", views.login),
     path("register/<str:rfid_pin>", views.register),
     path("weight/<str:rfid_pin>", views.weight),
@@ -15,4 +16,6 @@ urlpatterns = [
     path("summary/", views.day_summary),
     path("test_student/", views.create_test_users),
     path("test_meals/", views.create_test_meals),
+    path("days_eaten/", views.day_details),
+    path("day_data/", views.day_data),
 ]
