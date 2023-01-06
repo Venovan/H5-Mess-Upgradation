@@ -113,14 +113,19 @@ def register(request, rfid_pin):
             PIN_CODES[0] = request.GET["code"]
             return Response(status=status.HTTP_202_ACCEPTED)
         elif rfid_pin == "card":
-            if ROLL_WAITING[0] != None:
+            if (ROLL_WAITING[0] != None) and (Student.objects.get(rollNumber=ROLL_WAITING[0]).RFID == None):
                 student = Student.objects.get(rollNumber=ROLL_WAITING[0])
                 student.RFID = request.GET["rfid"]
                 student.save()
-                ROLL_WAITING[0] == None
+                ROLL_WAITING[0] = None
                 return Response(status=status.HTTP_423_LOCKED)
             else:
                 return Response(status=status.HTTP_304_NOT_MODIFIED)
+        elif rfid_pin == "confirm":
+            if ROLL_WAITING[0] != None:
+                return Response(ROLL_WAITING[0], status=status.HTTP_302_FOUND)
+            else:
+                return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['GET'])
@@ -175,35 +180,37 @@ def weight(request, rfid_pin):
                         meal = Meal.objects.get(
                             student__RFID=RFID, type=get_meal_type(), date=datetime.now().date())
                         if (meal.weight == None):
-                            ROLL_WAITING[2] = RFID
+                            ROLL_WAITING[2] = student.rollNumber
                             return Response(student.alias, status=status.HTTP_202_ACCEPTED)
                         else:
                             return Response(student.alias, status=status.HTTP_405_METHOD_NOT_ALLOWED)
                     except Meal.DoesNotExist:
-                        return Response(student.name, status=status.HTTP_206_PARTIAL_CONTENT)
+                        return Response(student.alias, status=status.HTTP_206_PARTIAL_CONTENT)
                 except Student.DoesNotExist:
                     return Response(status=status.HTTP_404_NOT_FOUND)
             elif ROLL_WAITING[2] != None:
-                return Response(Student.objects.filter(RFID=RFID).name, status=status.HTTP_202_ACCEPTED)
+                return Response(Student.objects.get(rollNumber=ROLL_WAITING[2]).alias, status=status.HTTP_202_ACCEPTED)
             else:
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
         elif rfid_pin == "update":
-            weight = request.GET["weight"]
+            try:
+                weight = request.GET["weight"]
+            except:
+                weight = None
             print(weight)
             if weight is None:
                 ROLL_WAITING[2] = None
                 return Response(status=status.HTTP_205_RESET_CONTENT)
             elif ROLL_WAITING[2] != None:
-                RFID = ROLL_WAITING[2]
-                print(RFID)
-                student = Student.objects.get(rollNumber=RFID)
+                rollNumber = ROLL_WAITING[2]
+                student = Student.objects.get(rollNumber=rollNumber)
                 meal = Meal.objects.get(
                     student=student, type=get_meal_type(), date=datetime.today())
                 ROLL_WAITING[2] = None
-                meal.weight = request.GET["weight"]
+                meal.weight = weight
                 meal.save()
-                return Response(Student.objects.get(rollNumber=RFID).name, status=status.HTTP_423_LOCKED)
+                return Response(student.alias, status=status.HTTP_423_LOCKED)
             else:
                 return Response(status=status.HTTP_204_NO_CONTENT)
 

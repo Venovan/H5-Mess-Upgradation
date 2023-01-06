@@ -18,14 +18,13 @@
 #include <MFRC522.h>
 #include <LiquidCrystal.h>
 #include <HTTPClient.h>
-#include <String.h>
-#include <Wifi.h>
-
-const char* ssid = "Samsung M31";
-const char* password = "12345678d";
+const char* ssid = "H5Mess";
+const char* password = "hostel5mess";
 
 //Your Domain name with URL path or IP address with path
-String serverName = "http://192.168.17.81:8000/mess/register/";
+String serverName = "http://192.168.0.101:8000/mess/register/";
+String hostname = "ESP32_Register";
+
 
 
 //RFID decalarations
@@ -48,11 +47,14 @@ int EnterPin = 32;
 int CancelPin = 33;
 int httpResponseCode;
 int Buzzer = 25;
+int TIME_THR = 2000;
 int data = 0, Enter = 0, Cancel = 0;
+unsigned long  CurrentTime, PreviousTime=0;
+unsigned long wifi_delay = 5000;
 
 void setup() {
   Serial.begin(115200);
-  
+  Serial.println("Yayy!!!");
   pinMode(Buzzer, OUTPUT);
   pinMode(EnterPin, INPUT);
   pinMode(CancelPin, INPUT); 
@@ -71,12 +73,18 @@ void setup() {
 
   //LCD setup for 16x2 display module
   lcd.begin(16, 2);
-  lcd.print("Hello World");
+  LCDprint("Hello World", 0);
 
   //WiFi setup
   WiFi.begin(ssid, password);
  
   while (WiFi.status() != WL_CONNECTED) {
+    if (millis() >= wifi_delay){
+      LCDprint("Router not found", 0);
+      LCDprint("Restarting...", 1);
+      delay(500);
+      ESP.restart();  
+    }    
     delay(500);
     Serial.print(".");
   }
@@ -108,57 +116,107 @@ void loop(){
     Serial.println(serverpath);
     http.begin(serverpath.c_str());
     httpResponseCode = http.GET();
-    if (httpResponseCode = 202) {
-      Serial.println("PinCode Accepted");
-      LCDprint("Pincode Accepted", 1);   
-    }
-    else{
-      Serial.print("Rejected with Error code:");
-      Serial.println(httpResponseCode);
+    switch (httpResponseCode = 202) {
+      case 202:
+      {
+        Serial.println("PinCode Accepted");
+        LCDprint("Pincode Accepted", 1); 
+        delay(1000);  
+        LCDprint("Use Pin", 1);
+      }
+      default:
+      {
+        Serial.print("Rejected with Error code:");
+        Serial.println(httpResponseCode);        
+      }
     }
     
     while(data == 0){
-
+      if ((WiFi.status() != WL_CONNECTED) && (millis() >= wifi_delay)){
+          LCDprint("Router not found", 0);
+          LCDprint("Reconnecting...", 1);
+          delay(500);
+          ESP.restart();
+      } 
       
       if (valid_card()){
         Serial.println("Valid Card detected");
-        LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
-        LCDprint("Valid Card Found", 1);  
+        //LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
+        LCDprint("A Card Found", 0);  
         valid_card_beep();      
         delay(1000);
-        LCDprint("Push to send", 1);
-        Serial.print("waiting for user to push any button");
-        delay(500);
-        while(Enter == 0 && Cancel == 0){
-          Serial.println("looping");       
-          Enter = digitalRead(EnterPin);
-          delay(10);
-          Cancel = digitalRead(CancelPin);
-          delay(10);                                               
-        }
-        if (Enter == 1){
-          LCDprint("sending...", 1);
-          delay(100);
-          Serial.println(Hex_to_String(rfid.uid.uidByte, rfid.uid.size).length());
-          serverpath = serverName + "card?rfid=" +  Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
-          http.begin(serverpath.c_str());
-          httpResponseCode = http.GET();
-          if (httpResponseCode = 423) {
-            LCDprint("Mapping Done", 1);
-            mapping_done_beep();
-            delay(1000);      
+        serverpath = serverName + "confirm";
+        http.begin(serverpath.c_str());
+        httpResponseCode = http.GET();
+        switch (httpResponseCode){
+          case 302:
+          {
+            String payload = http.getString();
+            LCDprint("Link card to", 0);
+            LCDprint(payload, 1);
+            delay(1500);
+            LCDprint(payload, 0);
+            LCDprint("Enter or Cancel?", 1);
+            //Serial.print("waiting for user to push any button");
+            delay(500);
+            while(Enter == 0 && Cancel == 0){
+              Serial.println("looping");       
+              Enter = digitalRead(EnterPin);
+              delay(10);
+              Cancel = digitalRead(CancelPin);
+              delay(10);                                               
+            }
+            if (Enter == 1){
+              LCDprint("sending...", 1);
+              delay(100);
+              Serial.println(Hex_to_String(rfid.uid.uidByte, rfid.uid.size).length());
+              serverpath = serverName + "card?rfid=" +  Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+              http.begin(serverpath.c_str());
+              httpResponseCode = http.GET();
+              switch(httpResponseCode){
+                case 304:
+                {
+                  LCDprint("Not Modified", 1);
+                  error_beep();
+                  delay(1000);
+                  break;
+                }
+                case 423:
+                {
+                  LCDprint("Mapping Done", 1);
+                  mapping_done_beep();
+                  delay(1000);
+                  break;
+                }
+                default:
+                {
+                  LCDprint("Error", 1);
+                  error_beep();
+                  delay(1000);
+                  break;
+                }
+              }                           
+            }
+            break;
+          } 
+          case 404:
+          {
+            LCDprint("Use pin in", 0); 
+            LCDprint("H5 Mess App", 1); 
+            delay(2000);
+            break;          
           }
-          else{
-            LCDprint("Error", 1);
-            error_beep();
-            delay(1000);            
-          }                
-        }
-        data = 1;
+          default:
+          {
+            LCDprint("unknown ERROR!!", 0);
+          }                      
+        }  
+        data = 1;     
       }      
     }
 
-  } }
+  } 
+}
 
 bool valid_card(){
     //not valid if no card is nearby
@@ -178,7 +236,7 @@ bool valid_card(){
         }
 
     //valid if new card is read than previous one
-    if (rfid.uid.uidByte[0] != nuidPICC[0] || 
+    /*if (rfid.uid.uidByte[0] != nuidPICC[0] || 
         rfid.uid.uidByte[1] != nuidPICC[1] || 
         rfid.uid.uidByte[2] != nuidPICC[2] || 
         rfid.uid.uidByte[3] != nuidPICC[3] ) {
@@ -188,7 +246,18 @@ bool valid_card(){
             rfid.PICC_HaltA();
             rfid.PCD_StopCrypto1();
             return true;
+        }*/
+      CurrentTime = millis();
+      if ((CurrentTime - PreviousTime) > TIME_THR) {
+        PreviousTime = CurrentTime;
+        for (byte i = 0; i < 4; i++){
+          nuidPICC[i] = rfid.uid.uidByte[i];
         }
+        rfid.PICC_HaltA();
+        rfid.PCD_StopCrypto1();
+        return true;
+      }
+      
     // Halt PICC
     rfid.PICC_HaltA();
 
