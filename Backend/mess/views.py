@@ -31,6 +31,11 @@ ROLL_WAITING = [None, None, None]
 
 
 @api_view(['GET'])
+def verify_network(request):
+    return Response({"name": "H5Mess"}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
 def get_status(request):
     return Response({
         "roll_waiting": ROLL_WAITING,
@@ -414,10 +419,30 @@ def day_summary(request):
         "data": data
     },)
 
-
 # INDIVIDUAL STATISTICS API CALLS
 
+
+@api_view(['GET'])
+def day_details(request):
+    rollNumber = request.headers.get("rollNumber")
+    student = Student.objects.get(rollNumber=rollNumber)
+    data = [x["date"] for x in Meal.objects.filter(
+        student=student).values('date').distinct()]
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def day_data(request):
+    rollNumber = request.headers.get("rollNumber")
+    date = request.headers.get("date")
+    student = Student.objects.get(rollNumber=rollNumber)
+    meals = Meal.objects.filter(student=student, date=date)
+    result = MealSerializer(meals, many=True)
+    return Response({"data": result.data}, status=status.HTTP_200_OK)
+
 # returns total food wasted for last x days upto given date "upto"
+
+
 def student_days_total(RL, start, end, type=None, operation="Sum"):
     if RL == None:
         return status.HTTP_400_BAD_REQUEST
@@ -486,17 +511,17 @@ def create_test_meals(request):
     for i in range(1, 11):
         rollNumber = "20002000" + str(i)
         student = Student.objects.get(rollNumber=rollNumber)
-        for i in range(1, 11):
+        for i in range(1, 7):
             breakfast = Meal.objects.create(
-                student=student, type="B", date=datetime.today()+timedelta(days=(i-1)), weight=random.randint(10, 75))
+                student=student, type="B", date=datetime.today()-timedelta(days=(i)), weight=random.randint(10, 75))
             breakfast.save()
             lunch = Meal.objects.create(
-                student=student, type="L", date=datetime.today()+timedelta(days=(i-1)), weight=random.randint(40, 120))
+                student=student, type="L", date=datetime.today()-timedelta(days=(i)), weight=random.randint(40, 120))
             lunch.save()
             snack = Meal.objects.create(
-                student=student, type="S", date=datetime.today()+timedelta(days=(i-1)), weight=random.randint(5, 100))
+                student=student, type="S", date=datetime.today()-timedelta(days=(i)), weight=random.randint(5, 100))
             snack.save()
             dinner = Meal.objects.create(
-                student=student, type="D", date=datetime.today()+timedelta(days=(i-1)), weight=random.randint(10, 150))
+                student=student, type="D", date=datetime.today()-timedelta(days=(i)), weight=random.randint(10, 150))
             dinner.save()
     return Response({})
