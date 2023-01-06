@@ -44,6 +44,12 @@ def get_status(request):
 
 
 @api_view(['POST'])
+def cancel_request(request):
+    ROLL_WAITING[0] = None
+    return Response({}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
 def sso_login(request):
     access_code = request.data.get("access_code")
     print("ACCESS CODE", access_code)
