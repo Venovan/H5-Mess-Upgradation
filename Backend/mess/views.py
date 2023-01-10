@@ -10,17 +10,18 @@ import H5Mess.settings as settings
 import requests
 import base64
 import json
-import random
+import random 
+import numpy as np
 
 
 def get_meal_type():
     hours = datetime.now().hour
     print(hours)
-    if hours in range(6, 12):
+    if hours in range(0, 11):
         return 'B'
-    elif hours in range(11, 17):
+    elif hours in range(11, 16):
         return 'L'
-    elif hours in range(16, 20):
+    elif hours in range(16, 19):
         return 'S'
     elif hours in range(19, 24):
         return 'D'
@@ -28,6 +29,43 @@ def get_meal_type():
 
 PIN_CODES = [None, None, None]
 ROLL_WAITING = [None, None, None]
+
+
+def verify_student(rollNumber):
+    hostel = np.loadtxt("H5Students.csv", delimiter=",", dtype=str)
+    if str(rollNumber) in hostel:
+        return True
+    else:
+        return False
+
+
+
+@api_view(['POST'])
+def fill_data(request, call):
+    if call == "uniform":
+        for key, value in request.data.items():
+            for each in Student.objects.all():
+                for day in range(len(value)):
+                    weight = value[len(value)-day-1]/len(Student.objects.all())
+                    if not Meal.objects.filter(student=each, date=datetime.today()-timedelta(days=day), type=key).exists():
+                        meal = Meal(student=each, date=datetime.today()-timedelta(days=day), type=key, weight=weight)
+                        meal.save()
+    elif call == "random":
+        days = int(request.data.get("days"))
+        for each in Student.objects.all():
+            for day in range(days):
+                for key in ['B', 'L', 'S', 'D']:
+                    weight=random.randint(10, 75)
+                    if not Meal.objects.filter(student=each, date=datetime.today()-timedelta(days=day), type=key).exists():
+                        meal = Meal(student=each, date=datetime.today()-timedelta(days=day), type=key, weight=weight)
+                        meal.save()
+    return Response(status=status.HTTP_201_CREATED)
+
+
+
+
+
+
 
 
 @api_view(['GET'])

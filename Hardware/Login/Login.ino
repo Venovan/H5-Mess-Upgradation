@@ -157,6 +157,7 @@ void loop(){
       switch (httpResponseCode = http.GET()){
         case 204:
         {
+          delay(200);
           continue;                    
         }
         case 404:

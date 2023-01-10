@@ -175,6 +175,7 @@ void loop(){
       switch (httpResponseCode = http.GET()){
         case 204:
         {
+          delay(100);          
           continue;                    
         }
         case 404:
@@ -405,17 +406,13 @@ int weighing(String name){
   LCDprint("weigh your plate", 1);
   mapping_done_beep();  
   delay(500);
+  LCDprint("waiting...", 1);
   for (int i=0; i<5; i++){
-    
-    long int reading1 = scale.get_units(20);
+    long int reading1 = scale.get_units(5);
     delay(100);
-    long int reading2 = scale.get_units(20);
+    long int reading2 = scale.get_units(5);
     long int reading = (reading1 + reading2)/2;
-    if (!((abs(reading1 - reading2) < WEIGHT_THR) && (reading1 > WEIGHT_THR) && (reading2 > WEIGHT_THR) && (reading < 10000))) {   //weight below 10000 and above WEIGHT_THR are valid
-      LCDprint("waiting!", 1);
-      single_beep();
-      delay(10);                  
-      LCDprint("  ", 1);
+    if (!((abs(reading1 - reading2) < WEIGHT_THR) && (reading < 10000) && reading > WEIGHT_THR)) {   //weight below 10000 and above WEIGHT_THR are valid
       continue;
     } 
     lcd.clear();

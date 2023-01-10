@@ -9,6 +9,7 @@ urlpatterns = [
     path("weight/<str:rfid_pin>", views.weight),
     path("app/<str:call>", views.app),
     path("stats/<str:call>", views.arena),
+    path("fill/<str:call>", views.fill_data),
     path("get_student/", views.get_student),
     path("update/", views.update),
     path("sso_login/", views.sso_login),
@@ -18,4 +19,5 @@ urlpatterns = [
     path("test_meals/", views.create_test_meals),
     path("days_eaten/", views.day_details),
     path("day_data/", views.day_data),
+    path("cancel/", views.cancel_request)
 ]
