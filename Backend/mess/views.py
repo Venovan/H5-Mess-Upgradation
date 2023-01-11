@@ -10,7 +10,7 @@ import H5Mess.settings as settings
 import requests
 import base64
 import json
-import random 
+import random
 import numpy as np
 
 
@@ -39,7 +39,6 @@ def verify_student(rollNumber):
         return False
 
 
-
 @api_view(['POST'])
 def fill_data(request, call):
     if call == "uniform":
@@ -48,24 +47,29 @@ def fill_data(request, call):
                 for day in range(len(value)):
                     weight = value[len(value)-day-1]/len(Student.objects.all())
                     if not Meal.objects.filter(student=each, date=datetime.today()-timedelta(days=day), type=key).exists():
-                        meal = Meal(student=each, date=datetime.today()-timedelta(days=day), type=key, weight=weight)
+                        meal = Meal(student=each, date=datetime.today(
+                        )-timedelta(days=day), type=key, weight=weight)
                         meal.save()
     elif call == "random":
         days = int(request.data.get("days"))
         for each in Student.objects.all():
             for day in range(days):
                 for key in ['B', 'L', 'S', 'D']:
-                    weight=random.randint(10, 75)
+                    weight = random.randint(10, 75)
                     if not Meal.objects.filter(student=each, date=datetime.today()-timedelta(days=day), type=key).exists():
-                        meal = Meal(student=each, date=datetime.today()-timedelta(days=day), type=key, weight=weight)
+                        meal = Meal(student=each, date=datetime.today(
+                        )-timedelta(days=day), type=key, weight=weight)
                         meal.save()
     return Response(status=status.HTTP_201_CREATED)
 
 
-
-
-
-
+@api_view(['POST'])
+def test_login(request):
+    student, _ = Student.objects.get_or_create(
+        rollNumber="200020059", name="Himanshu Choudhary")
+    student.save()
+    result = StudentSerializer(student, context={"request": request})
+    return Response(result.data)
 
 
 @api_view(['GET'])
