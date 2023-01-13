@@ -1,5 +1,5 @@
 from .models import Student, Meal, Menu, Announcement
-from .serializer import LoginSerializer, StudentSerializer, MenuSerializer, NoticeSerializer, MealSerializer
+from .serializer import StudentSerializer, MenuSerializer, NoticeSerializer, MealSerializer
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,11 +7,8 @@ from datetime import datetime, timedelta
 from django.db.models import Avg, Sum, Variance
 from django.db.models.fields.files import ImageFieldFile, FileField
 import H5Mess.settings as settings
-import requests
-import base64
-import json
-import random 
-import numpy as np
+import requests, random, csv, numpy as np, base64
+from django.http import HttpResponse
 
 
 def get_meal_type():
@@ -27,8 +24,15 @@ def get_meal_type():
         return 'D'
 
 
-PIN_CODES = [None, None, None]
-ROLL_WAITING = [None, None, None]
+
+REGISTER = None
+REGISTER_WAITING= None
+
+LOGIN = None
+LOGIN_WAITING = None
+
+WEIGHT = [None]*settings.WEIGHT_MACHINES
+WEIGHT_WAITING = [None]*settings.WEIGHT_MACHINES
 
 
 def verify_student(rollNumber):
@@ -62,9 +66,15 @@ def fill_data(request, call):
     return Response(status=status.HTTP_201_CREATED)
 
 
+@api_view(['GET'])
+def map_export(request):
+    response = HttpResponse(content_type="text/csv")
+    writer = csv.writer(response)
+    for students in Student.objects.all().values_list('rollNumber', 'RFID'):
+        writer.writerow(students)
 
-
-
+    response['Content-Disposition'] = 'attachment; filename="students_reg.csv'
+    return response
 
 
 
@@ -73,17 +83,9 @@ def verify_network(request):
     return Response({"name": "H5Mess"}, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
-def get_status(request):
-    return Response({
-        "roll_waiting": ROLL_WAITING,
-        "pin_codes": PIN_CODES
-    })
-
-
 @api_view(['POST'])
 def cancel_request(request):
-    ROLL_WAITING[0] = None
+    REGISTER_WAITING = None
     return Response({}, status=status.HTTP_200_OK)
 
 
@@ -106,10 +108,8 @@ def sso_login(request):
     resources = resources_response.json()
     print(resources)
     roll_number = resources.get("roll_number")
-    name = "{} {}".format(resources.get("first_name"),
-                          resources.get("last_name"))
-    student, _ = Student.objects.get_or_create(
-        name=name, rollNumber=roll_number)
+    name = "{} {}".format(resources.get("first_name"), resources.get("last_name"))
+    student, _ = Student.objects.get_or_create(name=name, rollNumber=roll_number)
     result = StudentSerializer(student, context={"request": request})
     return Response(result.data)
 
@@ -152,31 +152,35 @@ def get_student(request):
 
 @api_view(['GET', 'PATCH'])
 def register(request, rfid_pin):
+    global REGISTER
+    global REGISTER_WAITING
     if request.method == 'GET':
         if rfid_pin == "pin":
-            PIN_CODES[0] = request.GET["code"]
+            REGISTER = request.GET["code"]
             return Response(status=status.HTTP_202_ACCEPTED)
         elif rfid_pin == "card":
-            if (ROLL_WAITING[0] != None) and (Student.objects.get(rollNumber=ROLL_WAITING[0]).RFID == None):
-                student = Student.objects.get(rollNumber=ROLL_WAITING[0])
+            if (REGISTER_WAITING != None) and (Student.objects.get(rollNumber=REGISTER_WAITING).RFID == None):
+                student = Student.objects.get(rollNumber=REGISTER_WAITING)
                 student.RFID = request.GET["rfid"]
                 student.save()
-                ROLL_WAITING[0] = None
+                REGISTER_WAITING = None
                 return Response(status=status.HTTP_423_LOCKED)
             else:
                 return Response(status=status.HTTP_304_NOT_MODIFIED)
         elif rfid_pin == "confirm":
-            if ROLL_WAITING[0] != None:
-                return Response(ROLL_WAITING[0], status=status.HTTP_302_FOUND)
+            if REGISTER_WAITING != None:
+                return Response(REGISTER_WAITING, status=status.HTTP_302_FOUND)
             else:
                 return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['GET'])
 def login(request, rfid_pin):
+    global LOGIN
+    global LOGIN_WAITING
     if request.method == 'GET':
         if rfid_pin == "pin":
-            PIN_CODES[1] = request.GET["code"]
+            LOGIN = request.GET["code"]
             return Response(status=status.HTTP_202_ACCEPTED)
 
         elif rfid_pin == "recognise":
@@ -198,9 +202,9 @@ def login(request, rfid_pin):
                         return Response(student.alias, status=status.HTTP_201_CREATED)
                 except Student.DoesNotExist:
                     return Response(status=status.HTTP_404_NOT_FOUND)
-            elif (ROLL_WAITING[1] != None):
-                name = ROLL_WAITING[1]
-                ROLL_WAITING[1] = None
+            elif (LOGIN_WAITING != None):
+                name = LOGIN_WAITING
+                LOGIN_WAITING = None
                 return Response(name, status=status.HTTP_201_CREATED)
             else:
                 return Response(status=status.HTTP_204_NO_CONTENT)
@@ -208,11 +212,18 @@ def login(request, rfid_pin):
 
 @api_view(['GET'])
 def weight(request, rfid_pin):
+    global WEIGHT
+    global WEIGHT_WAITING
     if request.method == 'GET':
         if rfid_pin == "pin":
-            PIN_CODES[2] = request.GET["code"]
+            code = request.GET["code"]
+            i = int((int(code)-1000)/int(9000/settings.WEIGHT_MACHINES))
+            print(i)
+            print(code)
+            WEIGHT[i] = code
             return Response(status=status.HTTP_202_ACCEPTED)
         elif rfid_pin == "recognise":
+            index = request.GET["index"]
             try:
                 RFID = request.GET["rfid"]
             except:
@@ -221,10 +232,9 @@ def weight(request, rfid_pin):
                 try:
                     student = Student.objects.get(RFID=RFID)
                     try:
-                        meal = Meal.objects.get(
-                            student__RFID=RFID, type=get_meal_type(), date=datetime.now().date())
+                        meal = Meal.objects.get(student__RFID=RFID, type=get_meal_type(), date=datetime.now().date())
                         if (meal.weight == None):
-                            ROLL_WAITING[2] = student.rollNumber
+                            WEIGHT_WAITING[index] = student.rollNumber
                             return Response(student.alias, status=status.HTTP_202_ACCEPTED)
                         else:
                             return Response(student.alias, status=status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -232,26 +242,26 @@ def weight(request, rfid_pin):
                         return Response(student.alias, status=status.HTTP_206_PARTIAL_CONTENT)
                 except Student.DoesNotExist:
                     return Response(status=status.HTTP_404_NOT_FOUND)
-            elif ROLL_WAITING[2] != None:
-                return Response(Student.objects.get(rollNumber=ROLL_WAITING[2]).alias, status=status.HTTP_202_ACCEPTED)
+            elif WEIGHT_WAITING[index] != None:
+                return Response(Student.objects.get(rollNumber=WEIGHT_WAITING[index]).alias, status=status.HTTP_202_ACCEPTED)
             else:
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
         elif rfid_pin == "update":
             try:
                 weight = request.GET["weight"]
+                index = request.GET["index"]
             except:
                 weight = None
             print(weight)
             if weight is None:
-                ROLL_WAITING[2] = None
+                WEIGHT_WAITING[index] = None
                 return Response(status=status.HTTP_205_RESET_CONTENT)
-            elif ROLL_WAITING[2] != None:
-                rollNumber = ROLL_WAITING[2]
+            elif WEIGHT_WAITING[index] != None:
+                rollNumber = WEIGHT_WAITING[index]
                 student = Student.objects.get(rollNumber=rollNumber)
-                meal = Meal.objects.get(
-                    student=student, type=get_meal_type(), date=datetime.today())
-                ROLL_WAITING[2] = None
+                meal = Meal.objects.get(student=student, type=get_meal_type(), date=datetime.today())
+                WEIGHT_WAITING[index] = None
                 meal.weight = weight
                 meal.save()
                 return Response(student.alias, status=status.HTTP_423_LOCKED)
@@ -261,6 +271,9 @@ def weight(request, rfid_pin):
 
 @api_view(['GET', 'POST'])
 def app(request, call):
+    global REGISTER_WAITING
+    global LOGIN_WAITING
+    global WEIGHT_WAITING
     if request.method == 'GET':
         if call == "meal":
             rollNumber = request.headers.get("rollNumber")
@@ -275,22 +288,7 @@ def app(request, call):
             else:
                 return Response({"message": "Not Found"}, status=status.HTTP_204_NO_CONTENT)
 
-        """ if call == "status":
-            rollNumber = request.data.get("rollNumber")
-            student = Student.objects.get(rollNumber=rollNumber)
-            meal = Meal.objects.get(
-                student=student, type=get_meal_type(), date=datetime.now().date())
-            if (ROLL_WAITING[2] == rollNumber):
-                return Response(status=status.HTTP_425_TOO_EARLY)
-            elif (meal.weight == None):
-                return Response(status=status.HTTP_205_RESET_CONTENT)
-            else:
-                result = MealSerializer(meal)
-                return Response({
-                    "message": result.data
-                }, status=status.HTTP_202_ACCEPTED) """
-
-        if call == "status":
+        elif call == "status":
             id = int(request.headers.get("id"))
             if Meal.objects.filter(id=id).exists():
                 meal = Meal.objects.get(id=id)
@@ -325,47 +323,42 @@ def app(request, call):
         if call == "validate":
             print(request.data.get("machine"))
             print(request.data.get("code"))
-            print(PIN_CODES[int(request.data.get("machine"))]
-                  == request.data.get("code"))
-            if PIN_CODES[int(request.data.get("machine"))] == request.data.get("code"):
-                if request.data.get("machine") == "0":
-                    ROLL = request.data.get("rollNumber")
-                    ROLL_WAITING[0] = ROLL
+            if request.data.get("machine") == "register":
+                if REGISTER == request.data.get("code"):
+                    REGISTER_WAITING = request.data.get("rollNumber")
                     return Response(status=status.HTTP_202_ACCEPTED)
-                elif (request.data.get("machine") == "1"):
-                    print("reached")
+                else:
+                    return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
+            elif (request.data.get("machine") == "login"):
+                if LOGIN == request.data.get("code"):
                     try:
-                        student = Student.objects.get(
-                            rollNumber=request.data.get("rollNumber"))
+                        student = Student.objects.get(rollNumber=request.data.get("rollNumber"))
                         if (student.permission == 'NA'):
-                            return Response({
-                                "message": "Permission Denied"
-                            }, status=status.HTTP_403_FORBIDDEN)
+                            return Response({"message": "Permission Denied"}, status=status.HTTP_403_FORBIDDEN)
                         elif (Meal.objects.filter(student=student, type=get_meal_type(), date=datetime.now().date()).exists()):
-                            return Response({
-                                "message": "Meal Already Taken"
-                            }, status=status.HTTP_208_ALREADY_REPORTED)
+                            return Response({"message": "Meal Already Taken"}, status=status.HTTP_208_ALREADY_REPORTED)
                         else:
-                            meal = Meal(student=student, type=get_meal_type(
-                            ), weight=None, date=datetime.now().date())
+                            meal = Meal(student=student, type=get_meal_type(), weight=None, date=datetime.now().date())
                             meal.save()
                             result = MealSerializer(meal)
-                            ROLL_WAITING[int(request.data.get(
-                                "machine"))] = student.alias
-                            return Response({
-                                "message": result.data
-                            }, status=status.HTTP_201_CREATED)
+                            LOGIN_WAITING = student.alias
+                            return Response({"message": result.data}, status=status.HTTP_201_CREATED)
                     except Student.DoesNotExist:
                         return Response(status=status.HTTP_404_NOT_FOUND)
-                elif (request.data.get("machine") == "2"):
-                    rollNumber = request.data.get("rollNumber")
+                else:
+                    return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
+            elif (request.data.get("machine") == "weight"):
+                code = request.data.get("code")
+                index = int((int(code)-1000)/int(9000/settings.WEIGHT_MACHINES))
+                rollNumber = request.data.get("rollNumber")
+                if WEIGHT[index] == code:    
                     try:
                         student = Student.objects.get(rollNumber=rollNumber)
                         try:
                             meal = Meal.objects.get(
                                 student=student, type=get_meal_type(), date=datetime.now().date())
                             if (meal.weight is None):
-                                ROLL_WAITING[2] = rollNumber
+                                WEIGHT_WAITING[index] = rollNumber
                                 return Response(status=status.HTTP_202_ACCEPTED)
                             else:
                                 return Response(student.name, status=status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -373,8 +366,9 @@ def app(request, call):
                             return Response(student.name, status=status.HTTP_206_PARTIAL_CONTENT)
                     except Student.DoesNotExist:
                         return Response(status=status.HTTP_404_NOT_FOUND)
-            else:
-                return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
+                else:
+                    return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
+
 
         if call == "newStudent":
             serializer = StudentSerializer(data=request.data)
@@ -443,6 +437,7 @@ def moving_avg_waste(start, end, type=None):
         return Meal.objects.filter(date__range=[start, end]).aggregate(Avg("weight"))
     else:
         return Meal.objects.filter(date__range=[start, end], type=type).aggregate(Avg("weight"))
+
 
 
 @api_view(["GET"])

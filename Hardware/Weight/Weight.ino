@@ -60,6 +60,7 @@ int Pincode;
 int httpResponseCode;
 int Buzzer = 25;
 int TIME_THR = 2000;
+int index = 0
 unsigned long CurrentTime, PreviousTime = 0;
 unsigned long wifi_delay = 5000;
 float calibrationFactor;
@@ -164,10 +165,10 @@ void loop(){
         //LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
         LCDprint("Card Found", 1);  
         valid_card_beep();     
-        extent = "recognise?rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+        extent = "recognise?index=" + String(index) + "&rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
       }
       else{
-        extent= "recognise";
+        extent= "recognise?index=" + String(index);
       }
 
       serverpath = serverName + extent;

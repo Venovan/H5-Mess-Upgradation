@@ -31,8 +31,10 @@ DATE_INPUT_FORMATS = ['%d-%m-%Y']
 CSRF_TRUSTED_ORIGINS = [
     "https://54e1-2405-204-20a6-ba3a-144f-777b-6d7b-5032.in.ngrok.io", "http://127.0.0.1:8000/admin/", "https://05b1-117-212-15-22.in.ngrok.io/"]
 
+WEIGHT_MACHINES = 1
 
 # Application definition
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
