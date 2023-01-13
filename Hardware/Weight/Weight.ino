@@ -60,11 +60,11 @@ int Pincode;
 int httpResponseCode;
 int Buzzer = 25;
 int TIME_THR = 2000;
-int index = 0
+String id = "0";
 unsigned long CurrentTime, PreviousTime = 0;
 unsigned long wifi_delay = 5000;
 float calibrationFactor;
-float knownWeight = 210;
+float knownWeight = 700;
 String extent;
 
 void setup() {
@@ -165,10 +165,10 @@ void loop(){
         //LCDprint(Hex_to_String(rfid.uid.uidByte, rfid.uid.size), 0);
         LCDprint("Card Found", 1);  
         valid_card_beep();     
-        extent = "recognise?index=" + String(index) + "&rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
+        extent = "recognise?index=" + id + "&rfid=" + Hex_to_String(rfid.uid.uidByte, rfid.uid.size);
       }
       else{
-        extent= "recognise?index=" + String(index);
+        extent= "recognise?index=" + id;
       }
 
       serverpath = serverName + extent;
@@ -208,17 +208,17 @@ void loop(){
         case 202:
         {
           String payload =http.getString();
-          int weight = weighing(payload);  
+          int weight = weighing(payload); 
           Serial.println(String(weight)); 
           if (weight == -1){
               error_beep();
               LCDprint("No weight", 0);
               LCDprint("Try again!", 1);
-              delay(1000);              
-              serverpath = serverName + "update";
+              delay(500);              
+              serverpath = serverName + "update?index=" + id;
           }
-          else{    
-            serverpath = serverName + "update?weight=" + String(weight);  
+          else{                 
+            serverpath = serverName + "update?index=" + id + "&weight=" + String(weight);  
           }          
           http.begin(serverpath.c_str());
           switch(httpResponseCode = http.GET()){

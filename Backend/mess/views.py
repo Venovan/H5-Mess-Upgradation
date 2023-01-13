@@ -93,6 +93,7 @@ def verify_network(request):
 
 @api_view(['POST'])
 def cancel_request(request):
+    global REGISTER_WAITING
     REGISTER_WAITING = None
     return Response({}, status=status.HTTP_200_OK)
 
@@ -231,7 +232,7 @@ def weight(request, rfid_pin):
             WEIGHT[i] = code
             return Response(status=status.HTTP_202_ACCEPTED)
         elif rfid_pin == "recognise":
-            index = request.GET["index"]
+            index = int(request.GET["index"])
             try:
                 RFID = request.GET["rfid"]
             except:
@@ -256,9 +257,9 @@ def weight(request, rfid_pin):
                 return Response(status=status.HTTP_204_NO_CONTENT)
 
         elif rfid_pin == "update":
+            index = int(request.GET["index"])
             try:
                 weight = request.GET["weight"]
-                index = request.GET["index"]
             except:
                 weight = None
             print(weight)
@@ -270,7 +271,10 @@ def weight(request, rfid_pin):
                 student = Student.objects.get(rollNumber=rollNumber)
                 meal = Meal.objects.get(student=student, type=get_meal_type(), date=datetime.today())
                 WEIGHT_WAITING[index] = None
-                meal.weight = weight
+                if (get_meal_type() in ['B', 'S']):
+                    meal.weight = str(int(weight) - 260)
+                elif (get_meal_type() in ['L', 'D']):
+                    meal.weight = str(int(weight)  - 700)
                 meal.save()
                 return Response(student.alias, status=status.HTTP_423_LOCKED)
             else:
@@ -329,8 +333,7 @@ def app(request, call):
 
     elif request.method == "POST":
         if call == "validate":
-            print(request.data.get("machine"))
-            print(request.data.get("code"))
+            print(request.data)
             if request.data.get("machine") == "register":
                 if REGISTER == request.data.get("code"):
                     REGISTER_WAITING = request.data.get("rollNumber")
@@ -358,6 +361,7 @@ def app(request, call):
             elif (request.data.get("machine") == "weight"):
                 code = request.data.get("code")
                 index = int((int(code)-1000)/int(9000/settings.WEIGHT_MACHINES))
+                print(index)
                 rollNumber = request.data.get("rollNumber")
                 if WEIGHT[index] == code:    
                     try:
@@ -463,9 +467,43 @@ def day_summary(request):
         day = Meal.objects.filter(date=date)
         sum = 0
         for meal in day:
-            sum += float(meal.weight)
-        print(sum)
+            if(meal.weight is None):
+                pass
+            else:
+                sum += float(meal.weight)
         data.append([date, sum])
+        date += timedelta(days=1)
+    return Response({
+        "total": total["weight__sum"],
+        "average": average["weight__avg"],
+        "data": data
+    },)
+
+@api_view(["GET"])
+def day_summary_average(request):
+    start = datetime.fromisoformat(request.headers.get("start"))
+    end = datetime.fromisoformat(request.headers.get("end"))
+    type = request.headers.get("type")
+    print(start, end, type)
+    average = average_day_waste(start, end)
+    variance = 0.0
+    total = total_day_waste(start, end)
+    data = []
+    date = start
+    while(date <= end):
+        day = Meal.objects.filter(date=date)
+        sum = 0
+        num = 0
+        for meal in day:
+            num += 1
+            if(meal.weight is None):
+                pass
+            else:
+                sum += float(meal.weight)
+        avg = 0
+        if(num!=0):
+            avg = sum/num
+        data.append([date, avg])
         date += timedelta(days=1)
     return Response({
         "total": total["weight__sum"],

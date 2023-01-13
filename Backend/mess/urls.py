@@ -21,4 +21,5 @@ urlpatterns = [
     path("day_data/", views.day_data),
     path("cancel/", views.cancel_request),
     path("test_login/", views.test_login),
+    path("summary_average/", views.day_summary_average),
 ]
