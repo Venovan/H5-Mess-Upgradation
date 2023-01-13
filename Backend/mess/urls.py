@@ -19,5 +19,6 @@ urlpatterns = [
     path("test_meals/", views.create_test_meals),
     path("days_eaten/", views.day_details),
     path("day_data/", views.day_data),
-    path("cancel/", views.cancel_request)
+    path("cancel/", views.cancel_request),
+    path("test_login/", views.test_login),
 ]
