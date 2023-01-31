@@ -18,8 +18,8 @@
 #include <MFRC522.h>
 #include <LiquidCrystal.h>
 #include <HTTPClient.h>
-const char* ssid = "H5Mess";
-const char* password = "hostel5mess";
+const char* ssid = "H5Tech";
+const char* password = "hostel5tech";
 
 //Your Domain name with URL path or IP address with path
 String serverName = "http://192.168.0.101:8000/mess/register/";

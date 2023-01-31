@@ -42,7 +42,7 @@ class Student(models.Model):
     permission = models.CharField(max_length=10, choices=STATUS, default='A')
     rollNumber = models.CharField(max_length=12, validators=[ID_valid], unique=True)
     roomNumber = models.CharField(max_length=6)
-    RFID = models.CharField(max_length=15, blank=True, unique=False, null=True)
+    RFID = models.CharField(max_length=15, blank=True, unique=True, null=True)
     photo = models.ImageField(upload_to=image_handler, default='avatar.jpg')
 
     class Meta:

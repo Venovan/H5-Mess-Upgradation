@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from django.db.models import Avg, Sum, Variance
 from django.db.models.fields.files import ImageFieldFile, FileField
 import H5Mess.settings as settings
-import requests, random, csv, numpy as np, base64
+import requests, random, csv, numpy as np, base64, sys, os
 from django.http import HttpResponse
 
 
@@ -36,7 +36,7 @@ WEIGHT_WAITING = [None]*settings.WEIGHT_MACHINES
 
 
 def verify_student(rollNumber):
-    hostel = np.loadtxt("H5Students.csv", delimiter=",", dtype=str)
+    hostel = np.loadtxt(os.path.join(sys.path[0] + "\H5Students.csv"), delimiter=",", dtype=str)
     if str(rollNumber) in hostel:
         return True
     else:
@@ -76,6 +76,7 @@ def map_export(request):
 
     response['Content-Disposition'] = 'attachment; filename="students_reg.csv'
     return response
+
 
 @api_view(['POST'])
 def test_login(request):
@@ -117,10 +118,13 @@ def sso_login(request):
     resources = resources_response.json()
     print(resources)
     roll_number = resources.get("roll_number")
-    name = "{} {}".format(resources.get("first_name"), resources.get("last_name"))
-    student, _ = Student.objects.get_or_create(name=name, rollNumber=roll_number)
-    result = StudentSerializer(student, context={"request": request})
-    return Response(result.data)
+    if (verify_student(roll_number)):
+        name = "{} {}".format(resources.get("first_name"), resources.get("last_name"))
+        student, _ = Student.objects.get_or_create(name=name, rollNumber=roll_number)
+        result = StudentSerializer(student, context={"request": request})
+        return Response(result.data)
+    else:
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
 
 
 @api_view(['POST'])
@@ -272,9 +276,9 @@ def weight(request, rfid_pin):
                 meal = Meal.objects.get(student=student, type=get_meal_type(), date=datetime.today())
                 WEIGHT_WAITING[index] = None
                 if (get_meal_type() in ['B', 'S']):
-                    meal.weight = str(int(weight) - 260)
+                    meal.weight = str(int(weight))
                 elif (get_meal_type() in ['L', 'D']):
-                    meal.weight = str(int(weight)  - 700)
+                    meal.weight = str(int(weight))
                 meal.save()
                 return Response(student.alias, status=status.HTTP_423_LOCKED)
             else:
